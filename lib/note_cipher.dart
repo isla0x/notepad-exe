@@ -6,7 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// 잠긴 메모의 암호화 (cipher /e). AES-256-GCM, 키는 이 폰의 키체인에만 둔다.
 ///
-/// 앱에서는 main() 의 FlutterCryptography.enable() 로 iOS CryptoKit 이 실제 암호화를 한다.
+/// 앱에서는 cryptography_flutter 플러그인이 자동으로 켜져서 iOS CryptoKit 이 실제 암호화를 한다.
 /// (테스트에서는 같은 알고리즘의 Dart 구현이 돈다)
 abstract class NoteCipher {
   Future<String> encrypt(String plain);

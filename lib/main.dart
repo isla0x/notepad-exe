@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:cryptography_flutter/cryptography_flutter.dart';
 
 import 'lock.dart';
 import 'note_cipher.dart';
@@ -15,8 +14,6 @@ import 'widget_sync.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // 암호화(cipher)는 OS 의 암호화 기능(iOS CryptoKit)으로: 직접 만든 암호 코드를 쓰지 않는다.
-  FlutterCryptography.enable();
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   final pro = ProController();
   await pro.init();
