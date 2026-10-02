@@ -1,0 +1,100 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Prepare platform folders
+        run: bash tool/setup_platforms.sh
+
+      - name: Get packages
+        run: flutter pub get
+
+      - name: Analyze
+        # 실패하면 내용을 GitHub 주석(annotation)으로도 남긴다.
+        run: flutter analyze > analyze.txt 2>&1 || { cat analyze.txt; grep -E '(error|warning|info) •' analyze.txt | head -40 | sed 's/^/::error::/'; exit 1; }
+
+      - name: Test
+        run: flutter test --reporter github
+
+      - name: Build APK
+        run: |
+          set -o pipefail
+          flutter build apk --release 2>&1 | tee apk.txt || { grep -iE 'error|failed|requires|minSdk|compileSdk|what went wrong' -A2 apk.txt | grep -v '^ *$' | head -40 | sed 's/^/::error::/'; exit 1; }
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: notepad-exe-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
+
+  ios-build:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Prepare platform folders
+        run: bash tool/setup_platforms.sh
+
+      - name: Get packages
+        run: flutter pub get
+
+      - name: Build iOS (no codesign)
+        run: |
+          set -o pipefail
+          flutter build ios --release --no-codesign 2>&1 | tee ios.txt || { grep -iE 'error|requires|minimum|deployment' ios.txt | grep -v '^ *$' | head -40 | sed 's/^/::error::/'; exit 1; }
+
+      - name: Widget embedded in app
+        if: hashFiles('ios/NotepadWidget/NotepadWidget.swift') != ''
+        run: |
+          ls build/ios/iphoneos/Runner.app/PlugIns
+          test -d build/ios/iphoneos/Runner.app/PlugIns/NotepadWidgetExtension.appex || { echo "::error::위젯이 앱 안에 들어가지 않았어요"; exit 1; }
+          V=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' build/ios/iphoneos/Runner.app/PlugIns/NotepadWidgetExtension.appex/Info.plist)
+          A=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' build/ios/iphoneos/Runner.app/Info.plist)
+          echo "::notice::위젯 OK (앱 $A / 위젯 $V)"
+          [ "$V" = "$A" ] || { echo "::error::위젯 버전($V)이 앱 버전($A)과 달라요"; exit 1; }
+
+  # 위젯 Swift 코드가 컴파일되는지 확인 (Xcode 프로젝트 없이 타입 체크만)
+  ios-widget:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Typecheck widget Swift
+        run: |
+          xcodebuild -version
+          SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          if ! out=$(xcrun swiftc -typecheck -parse-as-library -sdk "$SDK" -target arm64-apple-ios17.0 ios_widget/*.swift 2>&1); then
+            echo "$out"
+            echo "$out" | grep -E "error:" | head -20 | while IFS= read -r line; do echo "::error::$line"; done
+            exit 1
+          fi
+          echo "$out"
+          echo "widget swift OK"

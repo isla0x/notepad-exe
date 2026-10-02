@@ -1,0 +1,45 @@
+name: notepad_exe
+description: "notepad.exe — 메모도 파일처럼. 터미널 메모장."
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shared_preferences: ^2.3.0
+  local_auth: ^2.3.0
+  in_app_purchase: ^3.2.0
+  home_widget: ">=0.9.0 <0.11.0"
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.4
+
+# 앱 아이콘: `dart run flutter_launcher_icons` (tool/setup_platforms.sh 가 알아서 돌린다)
+# 원본 그림은 design/icons/
+flutter_launcher_icons:
+  image_path: "assets/icon/icon.png"
+  ios: true
+  remove_alpha_ios: true
+  android: "ic_launcher"
+  adaptive_icon_background: "#1B1B1A"
+  adaptive_icon_foreground: "assets/icon/icon-foreground.png"
+
+flutter:
+  uses-material-design: true
+  fonts:
+    - family: JetBrainsMono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-Regular.ttf
+        - asset: assets/fonts/JetBrainsMono-Bold.ttf
+          weight: 700
+    - family: NanumGothicCoding
+      fonts:
+        - asset: assets/fonts/NanumGothicCoding-Regular.ttf
+        - asset: assets/fonts/NanumGothicCoding-Bold.ttf
+          weight: 700
