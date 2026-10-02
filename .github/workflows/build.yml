@@ -24,7 +24,9 @@ jobs:
           cache: true
 
       - name: Prepare platform folders
-        run: bash tool/setup_platforms.sh
+        run: |
+          set -o pipefail
+          bash tool/setup_platforms.sh 2>&1 | tee setup.txt || { grep -iE 'error|because|version solving|requires|depends on|incompatible|failed' setup.txt | head -40 | sed 's/^/::error::/'; exit 1; }
 
       - name: Get packages
         run: flutter pub get
@@ -61,7 +63,9 @@ jobs:
           cache: true
 
       - name: Prepare platform folders
-        run: bash tool/setup_platforms.sh
+        run: |
+          set -o pipefail
+          bash tool/setup_platforms.sh 2>&1 | tee setup.txt || { grep -iE 'error|because|version solving|requires|depends on|incompatible|failed' setup.txt | head -40 | sed 's/^/::error::/'; exit 1; }
 
       - name: Get packages
         run: flutter pub get
