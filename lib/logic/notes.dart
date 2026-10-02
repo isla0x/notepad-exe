@@ -42,7 +42,7 @@ class Note {
 
   int get lines => text.isEmpty ? 0 : '\n'.allMatches(text).length + 1;
 
-  /// <TXT> · <LOG> · <HID>
+  /// `<TXT>` · `<LOG>` · `<HID>`
   String get kind => hidden ? '<HID>' : (isLog ? '<LOG>' : '<TXT>');
 
   Map<String, dynamic> toJson() => {
