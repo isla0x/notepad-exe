@@ -12,6 +12,8 @@ dependencies:
   shared_preferences: ^2.3.0
   local_auth: ^2.3.0
   cryptography: ^2.7.0
+  # 폰에서는 AES 를 Apple CryptoKit(안드로이드는 javax.crypto)으로 돌린다
+  cryptography_flutter: ^2.3.2
   flutter_secure_storage: ^10.0.0
   gal: ^2.3.0
   share_plus: ^13.0.0
