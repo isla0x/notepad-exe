@@ -139,10 +139,13 @@ void main() {
     final t = DateTime(2026, 10, 1);
     var n = Note(id: 1, name: 'a.txt', text: 'v0', created: t, modified: t);
     for (var i = 1; i <= 12; i++) {
-      n = n.withVersion(n.text, t).copyWith(text: 'v$i');
+      final old = n.text;
+      n = n.copyWith(text: 'v$i').withVersion(old, t);
     }
+    expect(n.text, 'v12');
     expect(n.versions, hasLength(maxVersions));
     expect(n.versions.first.text, 'v11');
+    expect(n.withVersion('v11', t).versions, hasLength(maxVersions));
     expect(n.withVersion('v12', t).versions.first.text, 'v11');
   });
 
