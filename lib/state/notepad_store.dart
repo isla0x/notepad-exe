@@ -113,7 +113,7 @@ class NotepadStore extends ChangeNotifier {
     final stamped = n.copyWith(text: appendLogStamp(n.text, _clock()), modified: _clock());
     _data = _data.replace(stamped);
     _save();
-    notifyListeners();
+    // 화면을 만드는 중(initState)에 불리므로 여기서는 알리지 않는다. 목록은 닫을 때 갱신된다.
     return stamped;
   }
 

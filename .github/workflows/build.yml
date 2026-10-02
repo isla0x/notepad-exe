@@ -35,7 +35,7 @@ jobs:
 
       - name: Test
         # 실패한 테스트 이름과 이유를 GitHub 주석(annotation)으로도 남긴다.
-        run: flutter test --reporter expanded > test.txt 2>&1 || { cat test.txt; grep -E '\[E\]|Expected:|Actual:|Which:|══╡|Exception|Error:' test.txt | head -60 | sed 's/^/::error::/'; exit 1; }
+        run: flutter test --reporter expanded > test.txt 2>&1 || { cat test.txt; grep -E -A4 '\[E\]|Expected:|Actual:|Which:|══╡|Exception|Error:' test.txt | grep -v '^--$' | head -80 | sed 's/^/::error::/'; exit 1; }
 
       - name: Build APK
         run: |
