@@ -34,7 +34,8 @@ jobs:
         run: flutter analyze > analyze.txt 2>&1 || { cat analyze.txt; grep -E '(error|warning|info) •' analyze.txt | head -40 | sed 's/^/::error::/'; exit 1; }
 
       - name: Test
-        run: flutter test --reporter github
+        # 실패한 테스트 이름과 이유를 GitHub 주석(annotation)으로도 남긴다.
+        run: flutter test --reporter expanded > test.txt 2>&1 || { cat test.txt; grep -E '\[E\]|Expected:|Actual:|Which:|══╡|Exception|Error:' test.txt | head -60 | sed 's/^/::error::/'; exit 1; }
 
       - name: Build APK
         run: |

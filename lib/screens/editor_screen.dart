@@ -97,7 +97,8 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     _closing = true;
     store.updateText(widget.noteId, _ctrl.text);
     store.closed(widget.noteId);
-    if (mounted) Navigator.of(context).maybePop();
+    // PopScope 가 막는 건 뒤로 가기 제스처뿐: 여기서는 바로 닫는다.
+    if (mounted) Navigator.of(context).pop();
   }
 
   @override
