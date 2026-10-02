@@ -4,6 +4,26 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# 터미널이 flutter 를 못 찾으면: zsh 설정(~/.zshrc 의 PATH · alias)과 흔한 설치 위치에서 찾아 본다.
+if ! command -v flutter >/dev/null 2>&1; then
+  found=""
+  if command -v zsh >/dev/null 2>&1; then
+    found=$(zsh -ic 'print -r -- ${commands[flutter]:-${aliases[flutter]}}' 2>/dev/null | tail -1 | sed "s/^[\"']//; s/[\"']$//; s/^~/${HOME//\//\\/}/")
+  fi
+  for c in "$found" "$HOME/development/flutter/bin/flutter" "$HOME/flutter/bin/flutter" "$HOME/Developer/flutter/bin/flutter" \
+           "$HOME/fvm/default/bin/flutter" /opt/homebrew/bin/flutter /usr/local/bin/flutter; do
+    if [ -n "$c" ] && [ -x "$c" ]; then
+      export PATH="$(dirname "$c"):$PATH"
+      echo "flutter 찾음: $c"
+      break
+    fi
+  done
+  if ! command -v flutter >/dev/null 2>&1; then
+    echo "flutter 를 찾지 못했어요. 평소에 flutter build ipa 를 하던 터미널에서 'which flutter' 를 쳐서 나온 경로를 알려 주세요."
+    exit 1
+  fi
+fi
+
 if [ ! -d android ] || [ ! -d ios ]; then
   flutter create --org com.isla0x --project-name notepad_exe --platforms android,ios .
   # flutter create 가 만든 기본 테스트는 이 앱과 맞지 않아서 지운다.
