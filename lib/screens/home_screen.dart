@@ -12,7 +12,9 @@ import '../theme/term_palette.dart';
 import '../widget_sync.dart';
 import '../widgets/term_widgets.dart';
 import 'editor_screen.dart';
+import 'fc_screen.dart';
 import 'help_screen.dart';
+import 'print_screen.dart';
 import 'pro_screen.dart';
 
 /// 메인 화면: dir 목록 + 명령어 입력창.
@@ -45,7 +47,9 @@ class _HomeScreenState extends State<HomeScreen> {
     ('find', 'find '),
     ('type', 'type '),
     ('echo >>', 'echo  >> '),
-    ('attrib +h', 'attrib +h '),
+    ('fc', 'fc '),
+    ('print', 'print '),
+    ('cipher /e', 'cipher /e '),
     ('pin', 'pin '),
     ('help', null),
     ('cls', null),
@@ -95,8 +99,16 @@ class _HomeScreenState extends State<HomeScreen> {
     switch (out.route) {
       case 'edit':
         _openNote(out.noteId!);
-      case 'unhide':
-        _unhide(out.noteId!);
+      case 'encrypt':
+        store.encrypt(out.noteId!);
+      case 'decrypt':
+        _decrypt(out.noteId!);
+      case 'fc':
+        _focus.unfocus();
+        Navigator.of(context).push(termRoute(FcScreen(store: store, noteId: out.noteId!)));
+      case 'print':
+        _focus.unfocus();
+        Navigator.of(context).push(termRoute(PrintScreen(store: store, noteId: out.noteId!)));
       case 'pro' || 'restore':
         _openPro(restore: out.route == 'restore');
       case 'help':
@@ -114,7 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<bool> _confirm(Note n) async {
     if (!n.hidden) return true;
     _focus.unfocus();
-    final r = await widget.unlocker.unlock('잠긴 파일 ${n.name} 을(를) 열려면 확인이 필요해요.');
+    final r = await widget.unlocker.unlock('암호화된 파일 ${n.name} 을(를) 풀려면 확인이 필요해요.');
     if (r != UnlockResult.ok) store.note(unlockMessage(r), error: r != UnlockResult.cancelled);
     return r == UnlockResult.ok;
   }
@@ -126,18 +138,23 @@ class _HomeScreenState extends State<HomeScreen> {
     _busy = true;
     try {
       if (!await _confirm(n) || !mounted) return;
+      if (n.hidden && await store.unlock(id) == null) {
+        store.note('풀지 못했어요. 키를 찾을 수 없어요.', error: true);
+        return;
+      }
+      if (!mounted) return;
       _focus.unfocus();
-      await Navigator.of(context).push(termRoute(EditorScreen(store: store, noteId: id)));
+      await Navigator.of(context).push(termRoute(EditorScreen(store: store, noteId: id, reveal: n.hidden)));
       _scrollLog();
     } finally {
       _busy = false;
     }
   }
 
-  Future<void> _unhide(int id) async {
+  Future<void> _decrypt(int id) async {
     final n = store.data.byId(id);
     if (n == null || !await _confirm(n)) return;
-    store.unhide(id);
+    await store.decrypt(id);
   }
 
   void _openPro({bool restore = false}) {
@@ -178,6 +195,7 @@ class _HomeScreenState extends State<HomeScreen> {
         LogKind.err => p.warn,
         LogKind.info => p.dim,
         LogKind.text => p.hi,
+        LogKind.enc => p.acc,
       };
 
   @override
@@ -404,7 +422,7 @@ class _NoteRow extends StatelessWidget {
     final kindColor = n.hidden ? p.acc : (n.isLog ? p.tag : p.dim);
     return Semantics(
       button: true,
-      label: n.hidden ? '잠긴 파일 ${n.name}, 열려면 Face ID' : '${n.name}, ${comma(n.bytes)} 바이트, ${dirTime(n.modified)} 수정',
+      label: n.hidden ? '암호화된 파일 ${n.name}, 열려면 Face ID' : '${n.name}, ${comma(n.bytes)} 바이트, ${dirTime(n.modified)} 수정',
       excludeSemantics: true,
       child: InkWell(
         onTap: onTap,
@@ -425,7 +443,7 @@ class _NoteRow extends StatelessWidget {
               ),
               if (pinned) Padding(padding: const EdgeInsets.only(left: 6), child: Text('pin', style: termStyle(p.acc, size: 11))),
               const SizedBox(width: 8),
-              Text(n.hidden ? '잠김' : comma(n.bytes), style: termStyle(p.dim, size: 12)),
+              Text(n.hidden ? 'AES-256' : comma(n.bytes), style: termStyle(n.hidden ? p.acc : p.dim, size: 12)),
             ],
           ),
         ),

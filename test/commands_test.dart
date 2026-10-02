@@ -7,6 +7,11 @@ void main() {
   CommandResult go(NotepadData d, String s, {bool pro = false, int? pending}) =>
       runCommand(d, s, now, pro: pro, pendingDelete: pending);
   NotepadData run(NotepadData d, String s, {bool pro = false}) => go(d, s, pro: pro).data;
+  // 암호화는 비동기라 store 가 한다: 여기서는 암호화된 모양만 만든다.
+  NotepadData lock(NotepadData d, String name) {
+    final n = d.byName(name)!;
+    return d.replace(n.copyWith(hidden: true, text: '', cipher: () => 'U2FsdGVkX19x4Qm2vR8pKcT0n7wLh3Zs9bJdYq1eFtGuXo5MiAaPrSlVkNg2HcEyWzB6'));
+  }
 
   test('이름: .txt 붙이기 · 쓸 수 없는 글자', () {
     expect(normalizeName('장보기'), '장보기.txt');
@@ -54,7 +59,7 @@ void main() {
     var d = run(NotepadData.empty(), 'echo 우유 2개 >> 장보기');
     d = run(d, 'echo 저지방 우유 >> 마트');
     d = run(d, 'echo 우유 비밀 >> 비밀');
-    d = run(d, 'attrib +h 비밀', pro: true);
+    d = lock(d, '비밀');
     final r = go(d, 'find 우유');
     final texts = r.lines.map((l) => l.text).toList();
     expect(texts, contains('---------- 장보기.txt'));
@@ -83,28 +88,62 @@ void main() {
     expect(d.notes, isEmpty);
   });
 
-  test('attrib +h 는 PRO, 잠긴 메모는 type · del · ren · 위젯 안 됨', () {
-    var d = run(NotepadData.empty(), 'echo 엄마 스카프 >> 선물');
-    final free = go(d, 'attrib +h 선물');
-    expect(free.data.notes.single.hidden, isFalse);
+  test('cipher /e 는 PRO: 암호화는 store 가 (route encrypt)', () {
+    final d = run(NotepadData.empty(), 'echo 엄마 스카프 >> 선물');
+    final free = go(d, 'cipher /e 선물');
+    expect(free.route, isNull);
     expect(free.lines[1].text, contains('PRO'));
-    d = run(d, 'pin 선물');
-    expect(d.pinned, d.notes.single.id);
-    d = run(d, 'attrib +h 선물', pro: true);
-    expect(d.notes.single.hidden, isTrue);
-    expect(d.pinned, isNull);
+    final pro = go(d, 'attrib +h 선물', pro: true);
+    expect(pro.route, 'encrypt');
+    expect(pro.noteId, d.notes.single.id);
+    expect(pro.data.notes.single.hidden, isFalse);
+  });
+
+  test('암호화된 메모: 목록 · 위젯에서 빠지고, type 은 암호문, 나머지는 안 됨', () {
+    var d = run(NotepadData.empty(), 'echo 엄마 스카프 >> 선물');
+    d = lock(d, '선물');
     expect(d.listed(), isEmpty);
-    expect(d.listed(showHidden: true), hasLength(1));
+    expect(d.listed(showHidden: true).single.kind, '<ENC>');
     expect(d.widgetNote, isNull);
-    for (final c in ['type 선물', 'del 선물', 'ren 선물 비밀', 'pin 선물', 'echo x >> 선물']) {
-      expect(go(d, c).lines.any((l) => l.kind == LogKind.err), isTrue, reason: c);
+    final t = go(d, 'type 선물');
+    expect(t.lines[1].kind, LogKind.enc);
+    expect(t.lines[1].text, startsWith('U2FsdGVkX1'));
+    expect(t.lines.any((l) => l.text.contains('스카프')), isFalse);
+    for (final c in ['del 선물', 'ren 선물 비밀', 'pin 선물', 'echo x >> 선물', 'fc 선물', 'print 선물', 'cipher /e 선물']) {
+      expect(go(d, c, pro: true).route, isNull, reason: c);
     }
-    // 풀기는 화면이 Face ID 로 확인한 다음에
-    final un = go(d, 'attrib -h 선물');
-    expect(un.route, 'unhide');
-    expect(un.data.notes.single.hidden, isTrue);
-    // 여는 건 된다 (화면이 Face ID 를 먼저 물어본다)
+    expect(go(d, 'cipher /d 선물').route, 'decrypt');
+    expect(go(d, 'attrib -h 선물').route, 'decrypt');
     expect(go(d, 'edit 선물').route, 'edit');
+    expect(go(d, 'cipher').lines.last.text, contains('선물.txt'));
+  });
+
+  test('fc: 버전이 있어야 열리고, echo > 는 이전 내용을 버전으로', () {
+    var d = run(NotepadData.empty(), 'echo 우유 >> 장보기');
+    expect(go(d, 'fc 장보기').route, isNull);
+    d = run(d, 'echo 두부 > 장보기');
+    final n = d.byName('장보기')!;
+    expect(n.text, '두부');
+    expect(n.versions.single.text, '우유');
+    expect(go(d, 'fc 장보기').route, 'fc');
+    expect(go(d, 'print 장보기').route, 'print');
+    expect(go(d, 'print').lines[1].kind, LogKind.err);
+  });
+
+  test('diffLines: 지운 줄 · 더한 줄', () {
+    final d = diffLines('우유 2개\n대파\n계란 한 판', '우유 2개\n계란 한 판\n두부');
+    expect(d.map((x) => '${x.kind.name}:${x.text}'), ['same:우유 2개', 'removed:대파', 'same:계란 한 판', 'added:두부']);
+  });
+
+  test('withVersion: 최근 것부터, 같은 건 안 남기고, 최대 10개', () {
+    final t = DateTime(2026, 10, 1);
+    var n = Note(id: 1, name: 'a.txt', text: 'v0', created: t, modified: t);
+    for (var i = 1; i <= 12; i++) {
+      n = n.withVersion(n.text, t).copyWith(text: 'v$i');
+    }
+    expect(n.versions, hasLength(maxVersions));
+    expect(n.versions.first.text, 'v11');
+    expect(n.withVersion('v12', t).versions.first.text, 'v11');
   });
 
   test('dir /a 는 숨긴 파일까지', () {
@@ -142,7 +181,7 @@ void main() {
   test('저장했다 불러오기', () {
     var d = NotepadData.welcome(now);
     d = run(d, 'echo 우유 >> 장보기');
-    d = run(d, 'attrib +h 장보기', pro: true);
+    d = lock(d, '장보기');
     d = run(d, 'mode light');
     final back = NotepadData.fromJson(d.toJson());
     expect(back.notes.map((n) => n.name), [welcomeName, '장보기.txt']);

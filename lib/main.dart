@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'lock.dart';
+import 'note_cipher.dart';
 import 'pro/pro_controller.dart';
 import 'screens/boot_screen.dart';
 import 'screens/home_screen.dart';
@@ -16,7 +17,7 @@ Future<void> main() async {
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   final pro = ProController();
   await pro.init();
-  final store = NotepadStore(pro: pro);
+  final store = NotepadStore(pro: pro, cipher: KeychainCipher());
   await store.load();
   store.systemBrightness = WidgetsBinding.instance.platformDispatcher.platformBrightness;
 

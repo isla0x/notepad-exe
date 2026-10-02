@@ -2,7 +2,7 @@ import 'notes.dart';
 
 /// 명령어 해석과 실행. UI 와 저장소에 의존하지 않는 순수 로직이라 테스트하기 쉽다.
 
-enum LogKind { cmd, ok, err, info, text }
+enum LogKind { cmd, ok, err, info, text, enc }
 
 class LogLine {
   const LogLine(this.kind, this.text);
@@ -25,9 +25,12 @@ class CommandResult {
   final NotepadData data;
   final List<LogLine> lines;
 
-  /// 열어야 할 화면: 'edit' | 'unhide' | 'help' | 'pro' | 'restore'
-  ///   edit   = [noteId] 메모 열기 (숨긴 메모면 화면이 먼저 Face ID 로 확인한다)
-  ///   unhide = Face ID 로 확인한 뒤 [noteId] 의 숨김을 푼다
+  /// 열어야 할 화면: 'edit' | 'encrypt' | 'decrypt' | 'fc' | 'print' | 'help' | 'pro' | 'restore'
+  ///   edit    = [noteId] 메모 열기 (암호화된 메모면 화면이 먼저 Face ID 로 확인하고 푼다)
+  ///   encrypt = [noteId] 를 암호화해서 숨긴다 (PRO, 암호화는 비동기라 store 가 한다)
+  ///   decrypt = Face ID 로 확인한 뒤 [noteId] 의 암호화를 푼다
+  ///   fc      = [noteId] 의 이전 버전과 비교
+  ///   print   = [noteId] 를 메모장 창 이미지로
   final String? route;
   final int? noteId;
   final bool clearLog;
@@ -106,7 +109,14 @@ CommandResult runCommand(
     case 'type' || 'cat' || 'more':
       final note = _find(d, arg);
       if (note == null) return err(_notFound(arg));
-      if (note.hidden) return err('잠긴 파일이에요.', 'edit ${_bare(note.name)} 로 열면 Face ID 로 확인해요.');
+      if (note.hidden) {
+        final c = note.cipher ?? '';
+        return reply([
+          for (var i = 0; i < c.length && i < 44 * 3; i += 44) LogLine(LogKind.enc, c.substring(i, (i + 44).clamp(0, c.length))),
+          if (c.length > 44 * 3) const LogLine(LogKind.enc, '...'),
+          LogLine(LogKind.info, '암호화된 파일이에요. edit ${_bare(note.name)} 로 열면 Face ID 로 확인하고 풀어요.'),
+        ]);
+      }
       if (note.text.trim().isEmpty) return reply(const [LogLine(LogKind.info, '(빈 파일)')]);
       final lines = note.text.split('\n');
       return reply([
@@ -123,16 +133,17 @@ CommandResult runCommand(
       final name = normalizeName(m.group(3)!);
       if (name == null) return err(_badNameMessage(m.group(3)!));
       final target = d.byName(name);
-      if (target != null && target.hidden) return err('잠긴 파일에는 쓸 수 없어요.');
+      if (target != null && target.hidden) return err('암호화된 파일에는 쓸 수 없어요.');
       if (target == null) {
         if (d.notes.length >= maxNotes) return err('메모가 너무 많아요. (최대 $maxNotes개)');
         final (data, note) = d.create(name, now, text: text);
         return reply([LogLine(LogKind.ok, '✓ 새 파일 ${note.name} 에 썼어요.')], data: data);
       }
       final next = overwrite ? text : _appendLine(target.text, text);
+      final updated = target.copyWith(text: next, modified: now);
       return reply(
-        [LogLine(LogKind.ok, overwrite ? '✓ ${target.name} 을(를) 새로 썼어요.' : '✓ ${target.name} 에 한 줄 더했어요.')],
-        data: d.replace(target.copyWith(text: next, modified: now)),
+        [LogLine(LogKind.ok, overwrite ? '✓ ${target.name} 을(를) 새로 썼어요. (이전 내용은 fc 로)' : '✓ ${target.name} 에 한 줄 더했어요.')],
+        data: d.replace(overwrite ? updated.withVersion(target.text, target.modified) : updated),
       );
 
     case 'find' || 'findstr' || 'grep' || 'search':
@@ -149,7 +160,7 @@ CommandResult runCommand(
         out.addAll(lines.take(5).map((l) => LogLine(LogKind.text, l.trim())));
         if (lines.length > 5) out.add(LogLine(LogKind.info, '... ${lines.length - 5}줄 더'));
       }
-      if (hits == 0) return reply([LogLine(LogKind.info, "'$q' 을(를) 찾지 못했어요. (잠긴 파일은 찾지 않아요)")]);
+      if (hits == 0) return reply([LogLine(LogKind.info, "'$q' 을(를) 찾지 못했어요. (암호화된 파일은 찾지 않아요)")]);
       return reply([...out, LogLine(LogKind.ok, '$hits줄 찾음')]);
 
     case 'ren' || 'rename' || 'mv' || 'move':
@@ -157,7 +168,7 @@ CommandResult runCommand(
       if (a.length != 2) return err('사용법: ren 장보기 마트', '띄어쓰기가 있는 이름은 "따옴표" 로 묶어요.');
       final note = _find(d, a[0]);
       if (note == null) return err(_notFound(a[0]));
-      if (note.hidden) return err('잠긴 파일은 이름을 바꿀 수 없어요.', '먼저 attrib -h ${_bare(note.name)}');
+      if (note.hidden) return err('암호화된 파일은 이름을 바꿀 수 없어요.', '먼저 cipher /d ${_bare(note.name)}');
       final name = normalizeName(a[1]);
       if (name == null) return err(_badNameMessage(a[1]));
       final other = d.byName(name);
@@ -167,35 +178,48 @@ CommandResult runCommand(
     case 'del' || 'rm' || 'erase' || 'delete':
       final note = _find(d, arg);
       if (note == null) return err(arg.isEmpty ? '지울 파일 이름을 써 주세요.' : _notFound(arg));
-      if (note.hidden) return err('잠긴 파일은 지울 수 없어요.', '먼저 attrib -h ${_bare(note.name)}');
+      if (note.hidden) return err('암호화된 파일은 지울 수 없어요.', '먼저 cipher /d ${_bare(note.name)}');
       return CommandResult(d, [echo], askDelete: note.id);
 
-    case 'attrib':
+    case 'attrib' || 'cipher':
       final a = splitArgs(arg);
       if (a.isEmpty) {
-        final hidden = [for (final n in d.notes) if (n.hidden) n];
-        if (hidden.isEmpty) return reply(const [LogLine(LogKind.info, '숨긴 파일이 없어요. (숨기기: attrib +h 이름)')]);
-        return reply([for (final n in hidden) LogLine(LogKind.text, '  H    C:\\notes\\${n.name}')]);
+        final locked = [for (final n in d.notes) if (n.hidden) n];
+        if (locked.isEmpty) return reply(const [LogLine(LogKind.info, '암호화된 파일이 없어요. (잠그기: cipher /e 이름)')]);
+        return reply([for (final n in locked) LogLine(LogKind.enc, '  E    C:\\notes\\${n.name}')]);
       }
       final flag = a.first.toLowerCase();
+      final lock = flag == '+h' || flag == '/e';
+      final unlock = flag == '-h' || flag == '/d';
       final note = a.length >= 2 ? _find(d, a.sublist(1).join(' ')) : null;
-      if ((flag != '+h' && flag != '-h') || a.length < 2) {
-        return err('사용법: attrib +h 비밀 (숨기고 잠그기) · attrib -h 비밀 (풀기)');
+      if ((!lock && !unlock) || a.length < 2) {
+        return err('사용법: cipher /e 비밀 (암호화해서 잠그기) · cipher /d 비밀 (풀기)', 'attrib +h · attrib -h 도 같아요.');
       }
       if (note == null) return err(_notFound(a.sublist(1).join(' ')));
-      if (flag == '+h') {
-        if (note.hidden) return reply([LogLine(LogKind.info, '${note.name} 은(는) 이미 잠겨 있어요.')]);
-        if (!pro) return err('숨기기 · Face ID 잠금은 PRO 기능이에요.', "'upgrade' 로 자세히 볼 수 있어요.");
-        return reply(
-          [
-            LogLine(LogKind.ok, '✓ ${note.name} 을(를) 숨기고 잠갔어요.'),
-            const LogLine(LogKind.info, '숨긴 파일 보기: dir /a · 열 때는 Face ID'),
-          ],
-          data: d.replace(note.copyWith(hidden: true)).copyWith(pinned: () => d.pinned == note.id ? null : d.pinned),
-        );
+      if (lock) {
+        if (note.hidden) return reply([LogLine(LogKind.info, '${note.name} 은(는) 이미 암호화돼 있어요.')]);
+        if (!pro) return err('암호화 잠금은 PRO 기능이에요.', "'upgrade' 로 자세히 볼 수 있어요.");
+        return CommandResult(d, [echo], route: 'encrypt', noteId: note.id);
       }
-      if (!note.hidden) return reply([LogLine(LogKind.info, '${note.name} 은(는) 잠겨 있지 않아요.')]);
-      return CommandResult(d, [echo], route: 'unhide', noteId: note.id);
+      if (!note.hidden) return reply([LogLine(LogKind.info, '${note.name} 은(는) 암호화돼 있지 않아요.')]);
+      return CommandResult(d, [echo], route: 'decrypt', noteId: note.id);
+
+    case 'fc' || 'ver' || 'diff':
+      final a = splitArgs(arg);
+      if (a.isEmpty) return err('파일 이름을 써 주세요.', '예) fc 장보기');
+      final note = _find(d, a.first);
+      if (note == null) return err(_notFound(a.first));
+      if (note.hidden) return err('암호화된 파일은 버전을 남기지 않아요.');
+      if (note.versions.isEmpty) {
+        return reply([const LogLine(LogKind.info, '아직 이전 버전이 없어요. 고치고 닫으면 고치기 전 내용이 남아요.')]);
+      }
+      return CommandResult(d, [echo], route: 'fc', noteId: note.id);
+
+    case 'print' || 'export':
+      final note = _find(d, arg);
+      if (note == null) return err(arg.isEmpty ? '파일 이름을 써 주세요.' : _notFound(arg), arg.isEmpty ? '예) print 장보기' : null);
+      if (note.hidden) return err('암호화된 파일은 이미지로 만들 수 없어요.');
+      return CommandResult(d, [echo], route: 'print', noteId: note.id);
 
     case 'pin':
       if (arg.isEmpty) {
@@ -210,7 +234,7 @@ CommandResult runCommand(
       }
       final note = _find(d, arg);
       if (note == null) return err(_notFound(arg));
-      if (note.hidden) return err('잠긴 파일은 위젯에 올릴 수 없어요.');
+      if (note.hidden) return err('암호화된 파일은 위젯에 올릴 수 없어요.');
       return reply([LogLine(LogKind.ok, '✓ 위젯에 ${note.name} 을(를) 고정했어요.')], data: d.copyWith(pinned: () => note.id));
   }
 

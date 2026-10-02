@@ -11,6 +11,11 @@ dependencies:
     sdk: flutter
   shared_preferences: ^2.3.0
   local_auth: ^2.3.0
+  cryptography: ^2.7.0
+  flutter_secure_storage: ^9.2.2
+  gal: ^2.3.0
+  share_plus: ^13.0.0
+  path_provider: ^2.1.5
   in_app_purchase: ^3.2.0
   home_widget: ">=0.9.0 <0.11.0"
 

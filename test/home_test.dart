@@ -69,7 +69,7 @@ void main() {
     expect(find.text('선물.txt'), findsNothing);
     await send(tester, 'dir /a');
     expect(find.text('선물.txt'), findsOneWidget);
-    expect(find.text('잠김'), findsOneWidget);
+    expect(find.text('AES-256'), findsOneWidget);
     await tester.tap(find.text('선물.txt'));
     await tester.pumpAndSettle();
     expect(unlocker.calls, 1);
@@ -83,10 +83,11 @@ void main() {
     final (store, unlocker) = await pump(tester);
     await send(tester, 'edit 선물');
     expect(unlocker.calls, 1);
+    await tester.pump(const Duration(seconds: 2));
     expect(find.text('엄마 스카프'), findsOneWidget);
     await tester.tap(find.text('닫기'));
     await tester.pumpAndSettle();
-    await send(tester, 'attrib -h 선물');
+    await send(tester, 'cipher /d 선물');
     expect(unlocker.calls, 2);
     expect(store.data.notes.single.hidden, isFalse);
     expect(find.text('선물.txt'), findsOneWidget);

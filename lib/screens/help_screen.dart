@@ -15,6 +15,8 @@ const _entries = <(String, String, String, String?)>[
   ('find', '<말>', '모든 메모에서 찾기. 잠긴 파일은 찾지 않아요.', 'find 우유'),
   ('ren', '<이름> <새 이름>', '이름 바꾸기. 띄어쓰기가 있으면 "따옴표" 로.', 'ren "소설 아이디어" 소설'),
   ('del', '<이름>', '지우기. (Y/N) 으로 한 번 더 물어봐요.', 'del 장보기'),
+  ('fc', '<이름> [/2]', '고치기 전 버전과 지금을 줄 단위로 비교 (- 지운 줄 · + 더한 줄). 그 버전으로 되돌리기도 돼요.', 'fc 장보기'),
+  ('print', '<이름>', '메모를 옛날 컴퓨터 창 모양 이미지(1080 x 1350)로 저장 · 공유. retro · cmd · paper.', 'print 소설 아이디어'),
   ('pin', '<이름>', '위젯에 이 메모 고정. pin - 이면 최근에 고친 메모.', 'pin 장보기'),
   ('cls', '', '화면 로그만 지워요. 메모는 그대로예요.', null),
   ('mode', '[dark | light | auto]', '화면 밝기. auto 는 폰 설정을 따라가요.', 'mode light'),
@@ -25,9 +27,9 @@ const _entries = <(String, String, String, String?)>[
 
 /// 아이폰에서만 보인다.
 const _proEntries = <(String, String, String, String?)>[
-  ('attrib +h', '<이름>', 'PRO · 숨기고 잠그기. 목록에서 사라지고, 열 때 Face ID 로 확인해요.', 'attrib +h 비밀'),
-  ('attrib -h', '<이름>', 'Face ID 로 확인하고 잠금 풀기.', null),
-  ('upgrade', '', 'PRO 소개와 구매. 잠금 + 홈 화면 · 잠금화면 위젯.', null),
+  ('cipher /e', '<이름>', 'PRO · AES-256 으로 암호화하고 숨기기. 열 때 Face ID 로 확인하고 이 폰 안에서만 풀어요. (attrib +h 도 같아요)', 'cipher /e 비밀'),
+  ('cipher /d', '<이름>', 'Face ID 로 확인하고 암호화 풀기. (attrib -h 도 같아요)', null),
+  ('upgrade', '', 'PRO 소개와 구매. 암호화 + 홈 화면 · 잠금화면 위젯.', null),
   ('restore', '', '예전에 산 PRO 를 다시 불러와요. (기기 변경, 재설치)', null),
 ];
 

@@ -14,7 +14,7 @@ class ProScreen extends StatelessWidget {
   final NotepadStore store;
 
   static const _features = [
-    ('숨기기 · Face ID 잠금', 'attrib +h 비밀 → 목록에서 사라지고, 열 때마다 Face ID'),
+    ('cipher 암호화', 'AES-256 · 키는 이 폰의 키체인에만. 열 때 Face ID, 깨진 글자가 풀리면서 열려요'),
     ('홈 화면 위젯', '작게 · 중간. 고정한 메모(pin) 또는 최근 메모, 파일 목록'),
     ('잠금화면 위젯', '직사각형 · 시계 위 한 줄'),
     ('위젯 누르면 그 메모가 바로', '중간 위젯은 파일마다 눌러서 열기'),
@@ -147,7 +147,7 @@ class ProScreen extends StatelessWidget {
   List<Widget> _activeInfo(TermPalette p) => [
         Text('✓ PRO 활성화됨', style: termStyle(p.ok, weight: FontWeight.w700)),
         const SizedBox(height: 8),
-        Text('잠그기: attrib +h 이름 · 풀기: attrib -h 이름', style: termStyle(p.dim, size: 13)),
+        Text('암호화: cipher /e 이름 · 풀기: cipher /d 이름', style: termStyle(p.dim, size: 13)),
         const SizedBox(height: 4),
         Text('홈 화면 위젯: 홈 화면 길게 누르기 → 편집 → 위젯 추가 → notepad.exe', style: termStyle(p.dim, size: 13)),
         const SizedBox(height: 4),
@@ -227,8 +227,8 @@ class _WidgetPreview extends StatelessWidget {
                 children: [
                   Text('dir /a', style: termStyle(p.cmd, size: 11)),
                   const SizedBox(height: 6),
-                  Text('<HID> 비밀.txt', maxLines: 1, style: termStyle(p.acc, size: 11)),
-                  Text('잠김 · Face ID', style: termStyle(p.dim, size: 11)),
+                  Text('<ENC> 비밀.txt', maxLines: 1, style: termStyle(p.acc, size: 11)),
+                  Text('U2FsdGVkX19x4Q…', maxLines: 1, style: termStyle(p.dim, size: 11)),
                   const SizedBox(height: 8),
                   Text('<TXT> 장보기.txt', maxLines: 1, style: termStyle(p.fg, size: 11)),
                 ],

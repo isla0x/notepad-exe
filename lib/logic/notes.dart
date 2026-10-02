@@ -3,6 +3,23 @@ import 'dart:convert';
 /// 밝기 모드. auto = 폰 설정을 따른다.
 const modeIds = ['auto', 'light', 'dark'];
 
+/// 고치기 전 내용 하나 (fc · ver)
+class NoteVersion {
+  const NoteVersion(this.at, this.text);
+
+  /// 이 내용이 마지막으로 저장된 시각
+  final DateTime at;
+  final String text;
+
+  Map<String, dynamic> toJson() => {'at': at.millisecondsSinceEpoch, 'text': text};
+
+  factory NoteVersion.fromJson(Map<String, dynamic> j) =>
+      NoteVersion(DateTime.fromMillisecondsSinceEpoch((j['at'] as num).toInt()), j['text'] as String? ?? '');
+}
+
+/// 메모마다 남기는 이전 버전 수
+const maxVersions = 10;
+
 /// 메모 하나 = 파일 하나.
 class Note {
   const Note({
@@ -12,38 +29,66 @@ class Note {
     required this.created,
     required this.modified,
     this.hidden = false,
+    this.cipher,
+    this.versions = const [],
   });
 
   final int id;
 
   /// 장보기.txt
   final String name;
+
+  /// 내용. 암호화된 메모는 비어 있고 [cipher] 에 들어 있다.
   final String text;
   final DateTime created;
   final DateTime modified;
 
-  /// attrib +h: 목록에서 숨기고 열 때 Face ID 로 확인한다 (PRO).
+  /// cipher /e (attrib +h): 숨기고 암호화. 열 때 Face ID 로 확인하고 이 폰 안에서만 푼다 (PRO).
   final bool hidden;
 
-  Note copyWith({String? name, String? text, DateTime? modified, bool? hidden}) => Note(
+  /// AES-256-GCM 으로 암호화한 내용 (base64: nonce + 암호문 + MAC). 키는 키체인에만 있다.
+  final String? cipher;
+
+  /// 고치기 전 내용, 최근 것부터 (최대 [maxVersions]). 암호화된 메모는 남기지 않는다.
+  final List<NoteVersion> versions;
+
+  Note copyWith({
+    String? name,
+    String? text,
+    DateTime? modified,
+    bool? hidden,
+    String? Function()? cipher,
+    List<NoteVersion>? versions,
+  }) =>
+      Note(
         id: id,
         name: name ?? this.name,
         text: text ?? this.text,
         created: created,
         modified: modified ?? this.modified,
         hidden: hidden ?? this.hidden,
+        cipher: cipher != null ? cipher() : this.cipher,
+        versions: versions ?? this.versions,
       );
 
-  /// 첫 줄이 .LOG 이면 열 때마다 시간이 찍힌다 (옛 메모장의 숨은 기능).
-  bool get isLog => text.split('\n').first.trim() == '.LOG';
+  /// [old] 를 버전으로 남긴다 (바로 앞 버전 · 지금과 같으면 그대로).
+  Note withVersion(String old, DateTime at) {
+    if (hidden || old == text || (versions.isNotEmpty && versions.first.text == old)) return this;
+    return copyWith(versions: [NoteVersion(at, old), ...versions].take(maxVersions).toList());
+  }
 
-  /// UTF-8 바이트 수 (메모장이 보여주던 파일 크기)
-  int get bytes => utf8.encode(text).length;
+  bool get encrypted => hidden && cipher != null;
+
+  /// 첫 줄이 .LOG 이면 열 때마다 시간이 찍힌다 (옛 메모장의 숨은 기능).
+  bool get isLog => isLogText(text);
+
+  /// UTF-8 바이트 수 (메모장이 보여주던 파일 크기). 암호화된 메모는 암호문 크기.
+  int get bytes => utf8.encode(encrypted ? cipher! : text).length;
 
   int get lines => text.isEmpty ? 0 : '\n'.allMatches(text).length + 1;
 
-  /// `<TXT>` · `<LOG>` · `<HID>`
-  String get kind => hidden ? '<HID>' : (isLog ? '<LOG>' : '<TXT>');
+  /// `<TXT>` · `<LOG>` · `<ENC>`
+  String get kind => hidden ? '<ENC>' : (isLog ? '<LOG>' : '<TXT>');
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -52,6 +97,8 @@ class Note {
         'created': created.millisecondsSinceEpoch,
         'modified': modified.millisecondsSinceEpoch,
         if (hidden) 'hidden': true,
+        if (cipher != null) 'cipher': cipher,
+        if (versions.isNotEmpty) 'versions': [for (final v in versions) v.toJson()],
       };
 
   factory Note.fromJson(Map<String, dynamic> j) => Note(
@@ -61,6 +108,10 @@ class Note {
         created: DateTime.fromMillisecondsSinceEpoch((j['created'] as num?)?.toInt() ?? 0),
         modified: DateTime.fromMillisecondsSinceEpoch((j['modified'] as num?)?.toInt() ?? 0),
         hidden: j['hidden'] == true,
+        cipher: j['cipher'] as String?,
+        versions: [
+          for (final v in (j['versions'] as List? ?? const [])) NoteVersion.fromJson(Map<String, dynamic>.from(v as Map)),
+        ],
       );
 }
 
@@ -176,6 +227,8 @@ const welcomeText = 'notepad.exe 에 오신 걸 환영해요.\n'
     'echo 우유 >> 장보기   맨 끝에 한 줄 더하기\n'
     'ren 장보기 마트       이름 바꾸기\n'
     'del 장보기           지우기\n'
+    'fc 장보기            고치기 전과 비교 · 되돌리기\n'
+    'print 장보기         메모장 창 이미지로 저장 · 공유\n'
     '\n'
     '명령어가 아닌 말을 그냥 치면\n'
     '빠른 메모.txt 에 시간과 함께 저장돼요.\n'
@@ -184,6 +237,9 @@ const welcomeText = 'notepad.exe 에 오신 걸 환영해요.\n'
     '열 때마다 맨 끝에 지금 시간이 찍혀요.\n'
     '\n'
     '다 읽었으면: del 처음 읽어 주세요';
+
+/// 첫 줄이 .LOG 인지
+bool isLogText(String text) => text.split('\n').first.trim() == '.LOG';
 
 // ---------------------------------------------------------------- 이름
 
@@ -249,4 +305,47 @@ String comma(int n) {
 String appendLogStamp(String text, DateTime now) {
   final base = text.replaceFirst(RegExp(r'\s+$'), '');
   return '$base\n\n${logStamp(now)}\n';
+}
+
+// ---------------------------------------------------------------- fc (줄 비교)
+
+enum DiffKind { same, removed, added }
+
+class DiffLine {
+  const DiffLine(this.kind, this.text);
+
+  final DiffKind kind;
+  final String text;
+}
+
+/// 줄 단위 비교 (LCS). [older] → [newer] 로 바뀐 줄.
+List<DiffLine> diffLines(String older, String newer) {
+  final a = older.split('\n'), b = newer.split('\n');
+  final n = a.length, m = b.length;
+  final t = List.generate(n + 1, (_) => List.filled(m + 1, 0));
+  for (var i = n - 1; i >= 0; i--) {
+    for (var j = m - 1; j >= 0; j--) {
+      t[i][j] = a[i] == b[j] ? t[i + 1][j + 1] + 1 : (t[i + 1][j] >= t[i][j + 1] ? t[i + 1][j] : t[i][j + 1]);
+    }
+  }
+  final out = <DiffLine>[];
+  var i = 0, j = 0;
+  while (i < n && j < m) {
+    if (a[i] == b[j]) {
+      out.add(DiffLine(DiffKind.same, a[i]));
+      i++;
+      j++;
+    } else if (t[i + 1][j] >= t[i][j + 1]) {
+      out.add(DiffLine(DiffKind.removed, a[i++]));
+    } else {
+      out.add(DiffLine(DiffKind.added, b[j++]));
+    }
+  }
+  while (i < n) {
+    out.add(DiffLine(DiffKind.removed, a[i++]));
+  }
+  while (j < m) {
+    out.add(DiffLine(DiffKind.added, b[j++]));
+  }
+  return out;
 }

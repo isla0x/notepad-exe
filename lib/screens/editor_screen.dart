@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -10,10 +12,13 @@ import '../widgets/term_widgets.dart';
 
 /// `edit 장보기` 화면. 쓰는 대로 저장된다.
 class EditorScreen extends StatefulWidget {
-  const EditorScreen({super.key, required this.store, required this.noteId});
+  const EditorScreen({super.key, required this.store, required this.noteId, this.reveal = false});
 
   final NotepadStore store;
   final int noteId;
+
+  /// 암호화된 메모를 막 풀었을 때: 깨진 글자가 한 글자씩 풀리는 장면부터.
+  final bool reveal;
 
   @override
   State<EditorScreen> createState() => _EditorScreenState();
@@ -29,6 +34,12 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
   /// 잠긴 메모: 앱 전환 화면에 내용이 보이지 않게 가린다.
   bool _cover = false;
 
+  /// 해독 장면: 지금까지 풀린 글자 수 (null 이면 장면 끝)
+  int? _revealed;
+  Timer? _revealTimer;
+  final _rnd = math.Random();
+  static const _glyphs = 'ŸÿÐÞßæøþ¤§¶€£¥▒▓░█╬╫╪┼ÃÕÑ¿¡µÆØ¦¬±÷×ð';
+
   NotepadStore get store => widget.store;
   Note? get _note => store.data.byId(widget.noteId);
 
@@ -41,15 +52,38 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     final text = opened?.text ?? '';
     _ctrl = TextEditingController(text: text);
     _ctrl.selection = TextSelection.collapsed(offset: text.length);
-    if (text.isEmpty || (opened?.isLog ?? false)) {
+    if (widget.reveal && text.isNotEmpty) {
+      // 1.2초 안쪽으로 다 풀리게
+      final step = math.max(1, (text.length / 40).ceil());
+      _revealed = 0;
+      _revealTimer = Timer.periodic(const Duration(milliseconds: 30), (t) {
+        if (!mounted) {
+          t.cancel();
+          return;
+        }
+        final n = (_revealed ?? 0) + step;
+        setState(() => _revealed = n >= text.length ? null : n);
+        if (_revealed == null) t.cancel();
+      });
+    } else if (text.isEmpty || (opened?.isLog ?? false)) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _focus.requestFocus());
     }
+  }
+
+  String _noise(String text, int from) {
+    final b = StringBuffer();
+    for (var i = from; i < text.length; i++) {
+      final ch = text[i];
+      b.write(ch == '\n' || ch == ' ' ? ch : _glyphs[_rnd.nextInt(_glyphs.length)]);
+    }
+    return b.toString();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _savedTimer?.cancel();
+    _revealTimer?.cancel();
     _ctrl.dispose();
     _focus.dispose();
     super.dispose();
@@ -150,7 +184,10 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
                               const SizedBox(height: 4),
                               Text(
                                 [
-                                  if (note?.hidden ?? false) '잠긴 파일 · 앱을 나가면 닫혀요',
+                                  if (note?.hidden ?? false)
+                                    _revealed != null
+                                        ? 'cipher /d · 해독 중 ${(_revealed! * 100 / math.max(1, text.length)).round()}%'
+                                        : 'AES-256 · 앱을 나가면 다시 잠겨요',
                                   if (isLog) '.LOG · 열 때마다 시간이 찍혀요',
                                 ].join('  ·  '),
                                 style: termStyle(note?.hidden ?? false ? p.acc : p.tag, size: 12),
@@ -161,7 +198,18 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
                               child: Container(
                                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                                 decoration: BoxDecoration(border: Border.all(color: p.line)),
-                                child: Semantics(
+                                child: _revealed != null
+                                    ? SizedBox.expand(
+                                        child: ExcludeSemantics(
+                                          child: Text.rich(
+                                            TextSpan(children: [
+                                              TextSpan(text: text.substring(0, _revealed), style: termStyle(p.hi, size: 15, height: 1.6)),
+                                              TextSpan(text: _noise(text, _revealed!), style: termStyle(p.acc, size: 15, height: 1.6)),
+                                            ]),
+                                          ),
+                                        ),
+                                      )
+                                    : Semantics(
                                   label: '${note?.name ?? '메모'} 내용',
                                   child: TextField(
                                     controller: _ctrl,
@@ -188,7 +236,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
                               children: [
                                 Expanded(
                                   child: Text(
-                                    '줄 $lines · ${comma(note?.bytes ?? 0)} 바이트',
+                                    '줄 $lines · ${comma(utf8.encode(text).length)} 바이트',
                                     style: termStyle(p.dim, size: 12),
                                   ),
                                 ),

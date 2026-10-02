@@ -67,7 +67,9 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSFaceIDUsageDescription</key>
-	<string>Uses Face ID to open the notes you have locked.</string>
+	<string>Uses Face ID to open the notes you have encrypted.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Saves the image of your note to your photo library.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>CFBundleURLTypes</key>

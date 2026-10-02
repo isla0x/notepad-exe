@@ -11,7 +11,8 @@ void main() {
     var d = run(NotepadData.empty(), 'echo 우유 2개 >> 장보기', at: DateTime(2026, 10, 1));
     d = run(d, 'echo 두부 >> 장보기', at: DateTime(2026, 10, 1));
     d = run(d, 'echo 엄마 스카프 >> 선물');
-    d = run(d, 'attrib +h 선물');
+    final g = d.byName('선물')!;
+    d = d.replace(g.copyWith(hidden: true, text: '', cipher: () => 'U2FsdGVkX1'));
     final j = widgetSnapshot(d, now, pro: true);
     expect(j['pro'], isTrue);
     expect(j['count'], 1);

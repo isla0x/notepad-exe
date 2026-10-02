@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# android/ ios/ 폴더가 없으면 만들고, 앱 이름과 Face ID 권한 문구를 넣는다.
+# android/ ios/ 폴더가 없으면 만들고, 앱 이름과 Face ID · 사진 저장 권한 문구를 넣는다.
 # 여러 번 돌려도 안전하다. (이미 있는 설정은 건드리지 않는다)
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -39,7 +39,8 @@ if plist.exists():
     s = plist.read_text()
     s = re.sub(r"(<key>CFBundleDisplayName</key>\s*<string>)[^<]*(</string>)", r"\1notepad.exe\2", s)
     keys = {
-        "NSFaceIDUsageDescription": "Uses Face ID to open the notes you have locked.",
+        "NSFaceIDUsageDescription": "Uses Face ID to open the notes you have encrypted.",
+        "NSPhotoLibraryAddUsageDescription": "Saves the image of your note to your photo library.",
     }
     add = "".join(
         f"\t<key>{k}</key>\n\t<string>{v}</string>\n" for k, v in keys.items() if f"<key>{k}</key>" not in s
@@ -63,6 +64,13 @@ manifest = pathlib.Path("android/app/src/main/AndroidManifest.xml")
 if manifest.exists():
     s = manifest.read_text()
     s = re.sub(r'android:label="[^"]*"', 'android:label="notepad.exe"', s, count=1)
+    # 옛 기기(Android 10 이하)에서 사진 저장
+    if "xmlns:tools=" not in s:
+        s = s.replace("<manifest ", '<manifest xmlns:tools="http://schemas.android.com/tools" ', 1)
+    perm = ('<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" '
+            'android:maxSdkVersion="29" tools:replace="android:maxSdkVersion" />')
+    if "WRITE_EXTERNAL_STORAGE" not in s:
+        s = s.replace("<application", perm + "\n    <application", 1)
     manifest.write_text(s)
 
 # --- Android: local_auth(Face ID · 지문)는 FlutterFragmentActivity 가 필요하다 ---
