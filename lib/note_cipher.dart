@@ -19,7 +19,6 @@ class KeychainCipher implements NoteCipher {
       : _storage = storage ??
             const FlutterSecureStorage(
               iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
-              aOptions: AndroidOptions(encryptedSharedPreferences: true),
             );
 
   static const _keyName = 'notepad_exe_cipher_key_v1';
