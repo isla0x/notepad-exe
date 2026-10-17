@@ -128,7 +128,7 @@ class NotepadStore extends ChangeNotifier {
   /// 지금 (Y/N) 을 묻고 있으면 그 질문.
   String? get question {
     final n = _data.byId(pendingDelete);
-    return n == null ? null : 'C:\\notes\\' + tr('c.delq0', {'name': n.name});
+    return n == null ? null : 'C:\\notes\\${tr('c.delq0', {'name': n.name})}';
   }
 
   /// 화면에 보여줄 내용 (암호화된 메모는 풀어 둔 것)
