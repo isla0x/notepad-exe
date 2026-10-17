@@ -79,7 +79,7 @@
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Saves the image of your note to your photo library.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
-	<true/>
+	<false/>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
