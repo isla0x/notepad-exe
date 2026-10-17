@@ -8,6 +8,7 @@ import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../l10n/l10n.dart';
 import '../logic/commands.dart';
 import '../logic/notes.dart';
 import '../state/notepad_store.dart';
@@ -113,7 +114,7 @@ class _PrintScreenState extends State<PrintScreen> {
     try {
       if (!await Gal.hasAccess()) {
         if (!await Gal.requestAccess()) {
-          _say('access denied: photos\n설정 > notepad.exe 에서 사진 추가를 허용해 주세요.', error: true);
+          _say(tr('p.denied'), error: true);
           return;
         }
       }
@@ -185,7 +186,7 @@ class _PrintScreenState extends State<PrintScreen> {
                 const SizedBox(height: 12),
                 Center(
                   child: Semantics(
-                    label: '${n.name} 메모장 창 이미지 미리보기',
+                    label: tr('p.sem', {'name': n.name}),
                     image: true,
                     child: RepaintBoundary(
                       key: _cardKey,
@@ -308,7 +309,7 @@ class NoteCard extends StatelessWidget {
                   ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(6, 2, 6, 2),
-                    child: Text('파일   편집   보기   도움말', style: mono(l.faceInk, 8.5, h: 1.2)),
+                    child: Text(tr('p.menu'), style: mono(l.faceInk, 8.5, h: 1.2)),
                   ),
                   Expanded(
                     child: Container(
@@ -327,7 +328,7 @@ class NoteCard extends StatelessWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('줄 ${note.lines} · ${comma(note.bytes)} 바이트', style: mono(l.faceInk, 8, h: 1.2)),
+                        Text(tr('p.stats', {'l': note.lines, 'b': comma(note.bytes)}), style: mono(l.faceInk, 8, h: 1.2)),
                         Text(dirTime(note.modified), style: mono(l.faceInk, 8, h: 1.2)),
                       ],
                     ),

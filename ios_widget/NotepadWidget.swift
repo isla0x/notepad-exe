@@ -45,8 +45,17 @@ struct NotepadSnapshot: Decodable {
     let count: Int
     let note: WidgetNote?
     let recent: [RecentItem]
+    /// 앱이 지금 언어로 만들어 준 위젯 문구 (키는 lib/widget_sync.dart 의 widgetStringKeys)
+    var s: [String: String]? = nil
 
     var isPro: Bool { pro ?? false }
+
+    /// 문구 가져오기. {n} 같은 자리는 args 로 채운다. 없으면 fallback.
+    func t(_ key: String, _ fallback: String, _ args: [String: String] = [:]) -> String {
+        var out = s?[key] ?? fallback
+        for (k, v) in args { out = out.replacingOccurrences(of: "{" + k + "}", with: v) }
+        return out
+    }
 
     func isLight(_ scheme: ColorScheme) -> Bool {
         switch mode ?? "auto" {
@@ -164,6 +173,7 @@ struct PromptLine: View {
 
 /// 고정한 메모(또는 최근 메모) 내용
 struct NoteColumn: View {
+    let snap: NotepadSnapshot
     let note: WidgetNote?
     let c: TermColors
     let maxLines: Int
@@ -178,15 +188,15 @@ struct NoteColumn: View {
                     }
                 }
                 if n.lines.isEmpty {
-                    Text("(빈 파일)").font(mono(11)).foregroundColor(c.dim)
+                    Text(snap.t("w.empty", "(empty file)")).font(mono(11)).foregroundColor(c.dim)
                 } else {
                     ForEach(Array(n.lines.prefix(maxLines).enumerated()), id: \.offset) { _, line in
                         Text(line).font(mono(11)).foregroundColor(c.fg).lineLimit(1)
                     }
                 }
             } else {
-                Text("파일이 없어요").font(mono(11)).foregroundColor(c.dim)
-                Text("edit 장보기").font(mono(11)).foregroundColor(c.cmd)
+                Text(snap.t("w.nofiles", "No files")).font(mono(11)).foregroundColor(c.dim)
+                Text(snap.t("w.new", "edit notes")).font(mono(11)).foregroundColor(c.cmd)
             }
             Spacer(minLength: 0)
         }
@@ -200,7 +210,7 @@ struct SmallView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Header(c: c)
-            NoteColumn(note: snap.note, c: c, maxLines: 5)
+            NoteColumn(snap: snap, note: snap.note, c: c, maxLines: 5)
         }
         .padding(14)
         .widgetURL(snap.note.map { openURL($0.id) } ?? newURL)
@@ -216,15 +226,15 @@ struct MediumView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Header(c: c)
                 if let n = snap.note {
-                    Link(destination: openURL(n.id)) { NoteColumn(note: n, c: c, maxLines: 5) }
+                    Link(destination: openURL(n.id)) { NoteColumn(snap: snap, note: n, c: c, maxLines: 5) }
                 } else {
-                    NoteColumn(note: nil, c: c, maxLines: 5)
+                    NoteColumn(snap: snap, note: nil, c: c, maxLines: 5)
                 }
             }
             .frame(width: 138, alignment: .leading)
             Rectangle().fill(c.line).frame(width: 1)
             VStack(alignment: .leading, spacing: 3) {
-                Text("dir · \(snap.count)개 파일").font(mono(10)).foregroundColor(c.dim)
+                Text(snap.t("w.count", "dir · {n} files", ["n": String(snap.count)])).font(mono(10)).foregroundColor(c.dim)
                 ForEach(snap.recent.prefix(3), id: \.self) { r in
                     Link(destination: openURL(r.id)) {
                         HStack(spacing: 5) {
@@ -257,7 +267,7 @@ struct LockRectView: View {
                 }
             } else {
                 Text("C:\\notes>").font(mono(12, .bold)).widgetAccentable()
-                Text("파일이 없어요").font(mono(12))
+                Text(snap.t("w.nofiles", "No files")).font(mono(12))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -280,6 +290,7 @@ struct LockInlineView: View {
 // MARK: - PRO 가 아닐 때
 
 struct LockedHomeView: View {
+    let snap: NotepadSnapshot
     let c: TermColors
 
     var body: some View {
@@ -288,9 +299,9 @@ struct LockedHomeView: View {
             (Text("C:\\notes> ").foregroundColor(c.dim) + Text("widget").foregroundColor(c.cmd))
                 .font(mono(11))
             Text("Access is denied.").font(mono(12, .bold)).foregroundColor(c.warn)
-            Text("위젯은 PRO 기능이에요.").font(mono(11)).foregroundColor(c.fg)
+            Text(snap.t("w.pro", "Widgets are a PRO feature.")).font(mono(11)).foregroundColor(c.fg)
             Spacer(minLength: 0)
-            (Text("앱에서 ").foregroundColor(c.dim) + Text("upgrade").foregroundColor(c.cmd))
+            (Text(snap.t("w.inapp", "In the app: ")).foregroundColor(c.dim) + Text("upgrade").foregroundColor(c.cmd))
                 .font(mono(11))
                 .lineLimit(1)
         }
@@ -301,17 +312,18 @@ struct LockedHomeView: View {
 }
 
 struct LockedAccessoryView: View {
+    let snap: NotepadSnapshot
     let family: WidgetFamily
 
     var body: some View {
         switch family {
         case .accessoryInline:
-            Text(">_ notepad.exe · PRO 필요")
+            Text(snap.t("w.needpro", ">_ notepad.exe · PRO required"))
         default:
             VStack(alignment: .leading, spacing: 1) {
                 Text("C:\\notes> widget").font(mono(12, .bold)).widgetAccentable()
                 Text("Access is denied.").font(mono(12))
-                Text("앱에서 upgrade").font(mono(12))
+                Text(snap.t("w.upg", "upgrade in the app")).font(mono(12))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -332,9 +344,9 @@ struct NotepadWidgetView: View {
         let accessory = family == .accessoryRectangular || family == .accessoryInline
         if !snap.isPro {
             if accessory {
-                LockedAccessoryView(family: family).containerBackground(for: .widget) { Color.clear }
+                LockedAccessoryView(snap: snap, family: family).containerBackground(for: .widget) { Color.clear }
             } else {
-                LockedHomeView(c: c).containerBackground(for: .widget) { c.bg }
+                LockedHomeView(snap: snap, c: c).containerBackground(for: .widget) { c.bg }
             }
         } else {
             switch family {
@@ -351,6 +363,18 @@ struct NotepadWidgetView: View {
     }
 }
 
+/// 위젯 갤러리에 보이는 설명 (앱이 아직 아무것도 안 넘겼을 수 있어서 폰 언어를 직접 본다)
+func widgetDescription() -> String {
+    let lang = Locale.preferredLanguages.first?.prefix(2).lowercased() ?? "en"
+    switch lang {
+    case "ko": return "고정한 메모(pin)나 최근 메모를 보여줘요. 누르면 바로 열려요."
+    case "ja": return "固定したメモ (pin) または最近のメモを表示します。タップするとすぐ開きます。"
+    case "zh": return "显示固定的备忘 (pin) 或最近的备忘。点一下即可打开。"
+    case "fr": return "Affiche votre note épinglée (pin) ou la plus récente. Touchez pour l’ouvrir."
+    default: return "Shows your pinned note (pin) or the latest note. Tap to open it."
+    }
+}
+
 struct NotepadWidget: Widget {
     /// Flutter 쪽 WidgetSync.iOSWidgetKind 와 같아야 한다.
     let kind = "NotepadWidget"
@@ -360,7 +384,7 @@ struct NotepadWidget: Widget {
             NotepadWidgetView(entry: entry)
         }
         .configurationDisplayName("notepad.exe")
-        .description("고정한 메모(pin)나 최근 메모를 보여줘요. 누르면 바로 열려요.")
+        .description(widgetDescription())
         .supportedFamilies([.systemSmall, .systemMedium, .accessoryRectangular, .accessoryInline])
         .contentMarginsDisabled()
     }

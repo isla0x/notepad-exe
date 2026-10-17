@@ -11,9 +11,11 @@ import '../state/notepad_store.dart';
 import '../theme/term_palette.dart';
 import '../widget_sync.dart';
 import '../widgets/term_widgets.dart';
+import '../l10n/l10n.dart';
 import 'editor_screen.dart';
 import 'fc_screen.dart';
 import 'help_screen.dart';
+import 'lang_screen.dart';
 import 'print_screen.dart';
 import 'pro_screen.dart';
 
@@ -51,6 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
     ('print', 'print '),
     ('cipher /e', 'cipher /e '),
     ('pin', 'pin '),
+    ('lang', null),
     ('help', null),
     ('cls', null),
   ];
@@ -114,6 +117,9 @@ class _HomeScreenState extends State<HomeScreen> {
       case 'help':
         _focus.unfocus();
         Navigator.of(context).push(termRoute(HelpScreen(store: store)));
+      case 'lang':
+        _focus.unfocus();
+        Navigator.of(context).push(termRoute(LangScreen(store: store)));
     }
   }
 
@@ -126,7 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<bool> _confirm(Note n) async {
     if (!n.hidden) return true;
     _focus.unfocus();
-    final r = await widget.unlocker.unlock('암호화된 파일 ${n.name} 을(를) 풀려면 확인이 필요해요.');
+    final r = await widget.unlocker.unlock(tr('lock.reason', {'name': n.name}));
     if (r != UnlockResult.ok) store.note(unlockMessage(r), error: r != UnlockResult.cancelled);
     return r == UnlockResult.ok;
   }
@@ -139,7 +145,7 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       if (!await _confirm(n) || !mounted) return;
       if (n.hidden && await store.unlock(id) == null) {
-        store.note('풀지 못했어요. 키를 찾을 수 없어요.', error: true);
+        store.note(tr('s.dec.fail'), error: true);
         return;
       }
       if (!mounted) return;
@@ -159,7 +165,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _openPro({bool restore = false}) {
     if (!ProController.supported) {
-      store.note('PRO(잠금 · 위젯)는 지금은 아이폰 전용이에요.');
+      store.note(tr('h.proios'));
       return;
     }
     if (restore) store.pro?.restore();
@@ -231,7 +237,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       if (!typing) ...[
                         Text('NOTEPAD [Version 1.0.0]', style: termStyle(p.hi)),
-                        Text('생각나면 바로, 파일 하나로.', style: termStyle(p.dim, size: 13)),
+                        Text(tr('tag'), style: termStyle(p.dim, size: 13)),
                         const SizedBox(height: 12),
                       ],
                       Text.rich(TextSpan(children: [
@@ -239,7 +245,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         TextSpan(text: store.showHidden ? 'dir /a' : 'dir', style: termStyle(p.cmd)),
                       ])),
                       const SizedBox(height: 4),
-                      Text(' C:\\notes 디렉터리 · 누르면 열려요', style: termStyle(p.dim, size: 12)),
+                      Text(tr('h.dir'), style: termStyle(p.dim, size: 12)),
                       const SizedBox(height: 4),
                       Container(height: 1, color: p.line),
                       Expanded(
@@ -247,9 +253,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             ? Padding(
                                 padding: const EdgeInsets.only(top: 14),
                                 child: Text.rich(TextSpan(children: [
-                                  TextSpan(text: '파일이 없어요.\n', style: termStyle(p.dim, size: 13)),
-                                  TextSpan(text: 'edit 장보기', style: termStyle(p.cmd, size: 13)),
-                                  TextSpan(text: ' 로 첫 메모를 만들어 보세요.', style: termStyle(p.dim, size: 13)),
+                                  TextSpan(text: tr('h.empty1'), style: termStyle(p.dim, size: 13)),
+                                  TextSpan(text: 'edit ${tr('x.groc')}', style: termStyle(p.cmd, size: 13)),
+                                  TextSpan(text: tr('h.empty2'), style: termStyle(p.dim, size: 13)),
                                 ])),
                               )
                             : ListView.builder(
@@ -268,8 +274,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       Padding(
                         padding: const EdgeInsets.only(top: 6),
                         child: Text(
-                          '${list.where((n) => !n.hidden).length}개 파일 · ${comma(total)} 바이트'
-                          '${store.showHidden ? (hiddenCount > 0 ? ' · 숨김 $hiddenCount개' : '') : (hiddenCount > 0 ? ' · 숨긴 파일은 dir /a' : '')}',
+                          tr('h.count', {'n': list.where((n) => !n.hidden).length, 'size': comma(total)}) +
+                              (store.showHidden
+                                  ? (hiddenCount > 0 ? tr('h.hidden', {'n': hiddenCount}) : '')
+                                  : (hiddenCount > 0 ? tr('h.hidden2') : '')),
                           style: termStyle(p.dim, size: 12),
                         ),
                       ),
@@ -317,9 +325,9 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 6),
               Row(
                 children: [
-                  Expanded(child: TermBoxButton(palette: p, label: 'Y  지우기', textColor: p.warn, onTap: () => _run('y'))),
+                  Expanded(child: TermBoxButton(palette: p, label: tr('h.del'), textColor: p.warn, onTap: () => _run('y'))),
                   const SizedBox(width: 8),
-                  Expanded(child: TermBoxButton(palette: p, label: 'N  그대로', onTap: () => _run('n'))),
+                  Expanded(child: TermBoxButton(palette: p, label: tr('h.keep'), onTap: () => _run('n'))),
                 ],
               ),
             ] else
@@ -356,7 +364,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Focus(
                       onKeyEvent: _onKey,
                       child: Semantics(
-                        label: '명령어 또는 메모 입력',
+                        label: tr('h.sem.input'),
                         child: TextField(
                           controller: _ctrl,
                           focusNode: _focus,
@@ -369,7 +377,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           enableSuggestions: false,
                           textInputAction: TextInputAction.send,
                           decoration: InputDecoration.collapsed(
-                            hintText: question != null ? 'y 또는 n' : '메모 한 줄 또는 edit 장보기',
+                            hintText: question != null ? tr('h.hint.yn') : tr('h.hint', {'g': tr('x.groc')}),
                             hintStyle: termStyle(p.dim, size: 16, height: 1.2),
                           ),
                           onChanged: (_) => _histIdx = null,
@@ -382,7 +390,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   Semantics(
                     button: true,
-                    label: '실행',
+                    label: tr('h.sem.run'),
                     excludeSemantics: true,
                     child: InkWell(
                       onTap: () {
@@ -422,7 +430,9 @@ class _NoteRow extends StatelessWidget {
     final kindColor = n.hidden ? p.acc : (n.isLog ? p.tag : p.dim);
     return Semantics(
       button: true,
-      label: n.hidden ? '암호화된 파일 ${n.name}, 열려면 Face ID' : '${n.name}, ${comma(n.bytes)} 바이트, ${dirTime(n.modified)} 수정',
+      label: n.hidden
+          ? tr('h.sem.enc', {'name': n.name})
+          : tr('h.sem.file', {'name': n.name, 'size': comma(n.bytes), 'when': dirTime(n.modified)}),
       excludeSemantics: true,
       child: InkWell(
         onTap: onTap,

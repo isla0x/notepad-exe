@@ -1,8 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:notepad_exe/l10n/l10n.dart';
 import 'package:notepad_exe/logic/commands.dart';
 import 'package:notepad_exe/logic/notes.dart';
 
 void main() {
+  setUp(() => L10n.pref = 'ko');
   final now = DateTime(2026, 10, 2, 16, 52);
   CommandResult go(NotepadData d, String s, {bool pro = false, int? pending}) =>
       runCommand(d, s, now, pro: pro, pendingDelete: pending);

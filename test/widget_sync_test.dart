@@ -1,9 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:notepad_exe/l10n/l10n.dart';
 import 'package:notepad_exe/logic/commands.dart';
 import 'package:notepad_exe/logic/notes.dart';
 import 'package:notepad_exe/widget_sync.dart';
 
 void main() {
+  setUp(() => L10n.pref = 'ko');
   final now = DateTime(2026, 10, 2, 16, 52);
   NotepadData run(NotepadData d, String s, {DateTime? at}) => runCommand(d, s, at ?? now, pro: true).data;
 

@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:home_widget/home_widget.dart';
 
+import 'l10n/l10n.dart';
 import 'logic/notes.dart';
 
 /// 홈 화면 · 잠금화면 위젯(iOS WidgetKit)으로 데이터를 넘기고, 위젯을 누르면 앱이 알게 한다.
@@ -74,13 +75,20 @@ class WidgetRequest {
   }
 }
 
+/// 위젯이 쓰는 문구 키
+const widgetStringKeys = ['w.empty', 'w.nofiles', 'w.new', 'w.count', 'w.pro', 'w.inapp', 'w.needpro', 'w.upg'];
+
 /// 위젯이 읽는 JSON. Swift 쪽 `NotepadSnapshot` 과 키가 같아야 한다.
 /// 숨긴(잠긴) 메모는 이름도 내용도 절대 넣지 않는다.
 Map<String, dynamic> widgetSnapshot(NotepadData d, DateTime now, {bool pro = false, int maxLines = 8, int maxRecent = 4}) {
   final w = d.widgetNote;
   final visible = d.listed();
   return {
-    'v': 1,
+    'v': 2,
+    // 위젯 문구: 앱이 지금 쓰는 언어로 만들어 넘긴다 (Swift 쪽 snap.t(key) 가 읽음)
+    's': {
+      for (final k in widgetStringKeys) k: tr(k, k == 'w.new' ? {'g': sampleArgs['g']} : null),
+    },
     'pro': pro,
     'mode': d.mode,
     'count': visible.length,

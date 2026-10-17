@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../l10n/l10n.dart';
+
 /// 밝기 모드. auto = 폰 설정을 따른다.
 const modeIds = ['auto', 'light', 'dark'];
 
@@ -117,7 +119,7 @@ class Note {
 
 /// 앱에 저장되는 전부. UI 와 저장소에 의존하지 않는다.
 class NotepadData {
-  const NotepadData({required this.notes, required this.nextId, this.mode = 'auto', this.pinned});
+  const NotepadData({required this.notes, required this.nextId, this.mode = 'auto', this.pinned, this.lang = 'auto'});
 
   factory NotepadData.empty() => const NotepadData(notes: [], nextId: 1);
 
@@ -136,11 +138,15 @@ class NotepadData {
   /// 위젯에 보여줄 메모 (pin). 없으면 가장 최근에 고친 메모.
   final int? pinned;
 
-  NotepadData copyWith({List<Note>? notes, int? nextId, String? mode, int? Function()? pinned}) => NotepadData(
+  /// 언어: auto(폰 언어) 또는 ko | en | ja | zh | fr
+  final String lang;
+
+  NotepadData copyWith({List<Note>? notes, int? nextId, String? mode, int? Function()? pinned, String? lang}) => NotepadData(
         notes: notes ?? this.notes,
         nextId: nextId ?? this.nextId,
         mode: mode ?? this.mode,
         pinned: pinned != null ? pinned() : this.pinned,
+        lang: lang ?? this.lang,
       );
 
   Note? byId(int? id) {
@@ -197,6 +203,7 @@ class NotepadData {
         'nextId': nextId,
         'mode': mode,
         if (pinned != null) 'pinned': pinned,
+        if (lang != L10n.autoPref) 'lang': lang,
       };
 
   factory NotepadData.fromJson(Map<String, dynamic> j) {
@@ -212,31 +219,29 @@ class NotepadData {
       nextId: next,
       mode: modeIds.contains(j['mode']) ? j['mode'] as String : 'auto',
       pinned: (j['pinned'] as num?)?.toInt(),
+      lang: L10n.cleanPref(j['lang'] as String?),
     );
   }
 }
 
-const welcomeName = '처음 읽어 주세요.txt';
-const welcomeText = 'notepad.exe 에 오신 걸 환영해요.\n'
-    '메모 하나 = 파일 하나예요.\n'
-    '\n'
-    'edit 장보기          새 메모 (있으면 열기)\n'
-    'dir                 메모 목록\n'
-    'type 장보기          내용 보기\n'
-    'find 우유            모든 메모에서 찾기\n'
-    'echo 우유 >> 장보기   맨 끝에 한 줄 더하기\n'
-    'ren 장보기 마트       이름 바꾸기\n'
-    'del 장보기           지우기\n'
-    'fc 장보기            고치기 전과 비교 · 되돌리기\n'
-    'print 장보기         메모장 창 이미지로 저장 · 공유\n'
-    '\n'
-    '명령어가 아닌 말을 그냥 치면\n'
-    '빠른 메모.txt 에 시간과 함께 저장돼요.\n'
-    '\n'
-    '첫 줄에 .LOG 라고 쓰면\n'
-    '열 때마다 맨 끝에 지금 시간이 찍혀요.\n'
-    '\n'
-    '다 읽었으면: del 처음 읽어 주세요';
+/// 이름 · 사용법 메모는 지금 언어로. (이미 만든 메모는 그대로 둔다)
+String get welcomeName => tr('welcome.name');
+
+/// 예시에 쓰는 메모 이름 · 낱말 (언어마다 달라서 tr 로)
+Map<String, Object?> get sampleArgs => {
+      'g': tr('x.groc'),
+      'm': tr('x.milk'),
+      'k': tr('x.mart'),
+      'q': tr('quick.name'),
+      'w': tr('welcome.del'),
+    };
+
+String get welcomeText => tr('welcome.text', sampleArgs);
+
+/// 빠른 메모 파일 이름. 언어를 바꿔도 예전 이름의 파일을 그대로 찾는다.
+String get quickName => tr('quick.name');
+
+List<String> get quickNames => [for (final l in Lang.values) trIn(l, 'quick.name')];
 
 /// 첫 줄이 .LOG 인지
 bool isLogText(String text) => text.split('\n').first.trim() == '.LOG';
@@ -273,18 +278,20 @@ List<String> splitArgs(String s) {
 
 String two(int n) => n.toString().padLeft(2, '0');
 
-const weekdayKo = ['월', '화', '수', '목', '금', '토', '일'];
+/// 요일 이름 (월요일 = 1)
+String weekdayShort(int weekday) => tr('wd.$weekday');
 
 /// 10.02 금
-String shortDate(DateTime d) => '${two(d.month)}.${two(d.day)} ${weekdayKo[d.weekday - 1]}';
+String shortDate(DateTime d) => '${two(d.month)}.${two(d.day)} ${weekdayShort(d.weekday)}';
 
 /// 10-02 16:40 (dir 목록)
 String dirTime(DateTime d) => '${two(d.month)}-${two(d.day)} ${two(d.hour)}:${two(d.minute)}';
 
-/// 오후 4:52
+/// 오후 4:52 (영어 4:52 PM · 프랑스어 16:52)
 String clock12(DateTime d) {
+  if (tr('time.h24') == '1') return '${d.hour}:${two(d.minute)}';
   final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
-  return '${d.hour < 12 ? '오전' : '오후'} $h:${two(d.minute)}';
+  return tr(d.hour < 12 ? 'time.am' : 'time.pm', {'t': '$h:${two(d.minute)}'});
 }
 
 /// 오후 4:52 2026-10-02 (옛 메모장의 F5 · .LOG 와 같은 모양)

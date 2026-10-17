@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
 import '../logic/commands.dart';
 import '../logic/notes.dart';
 import '../state/notepad_store.dart';
@@ -177,7 +178,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                Text(_saved ? '✓ 저장됨' : '저장 중...', style: termStyle(_saved ? p.ok : p.dim, size: 12)),
+                                Text(_saved ? tr('e.saved') : tr('e.saving'), style: termStyle(_saved ? p.ok : p.dim, size: 12)),
                               ],
                             ),
                             if (isLog || (note?.hidden ?? false)) ...[
@@ -186,9 +187,9 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
                                 [
                                   if (note?.hidden ?? false)
                                     _revealed != null
-                                        ? 'cipher /d · 해독 중 ${(_revealed! * 100 / math.max(1, text.length)).round()}%'
-                                        : 'AES-256 · 앱을 나가면 다시 잠겨요',
-                                  if (isLog) '.LOG · 열 때마다 시간이 찍혀요',
+                                        ? tr('e.dec', {'p': (_revealed! * 100 / math.max(1, text.length)).round()})
+                                        : tr('e.sec'),
+                                  if (isLog) tr('e.log'),
                                 ].join('  ·  '),
                                 style: termStyle(note?.hidden ?? false ? p.acc : p.tag, size: 12),
                               ),
@@ -210,7 +211,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
                                         ),
                                       )
                                     : Semantics(
-                                  label: '${note?.name ?? '메모'} 내용',
+                                  label: tr('e.content', {'name': note?.name ?? tr('e.note')}),
                                   child: TextField(
                                     controller: _ctrl,
                                     focusNode: _focus,
@@ -223,7 +224,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
                                     cursorColor: p.acc,
                                     keyboardAppearance: p.isLight ? Brightness.light : Brightness.dark,
                                     decoration: InputDecoration.collapsed(
-                                      hintText: '여기에 쓰면 바로 저장돼요',
+                                      hintText: tr('e.hint'),
                                       hintStyle: termStyle(p.dim, size: 15, height: 1.6),
                                     ),
                                     onChanged: _onChanged,
@@ -236,7 +237,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
                               children: [
                                 Expanded(
                                   child: Text(
-                                    '줄 $lines · ${comma(utf8.encode(text).length)} 바이트',
+                                    tr('e.stats', {'l': lines, 'b': comma(utf8.encode(text).length)}),
                                     style: termStyle(p.dim, size: 12),
                                   ),
                                 ),
@@ -255,7 +256,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
                           children: [
                             Expanded(
                               flex: 3,
-                              child: TermWideButton(palette: p, keyLabel: '[ ESC ]', label: '닫기', onTap: _close),
+                              child: TermWideButton(palette: p, keyLabel: '[ ESC ]', label: tr('btn.close'), onTap: _close),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
@@ -264,9 +265,9 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
                                 height: 52,
                                 child: TermBoxButton(
                                   palette: p,
-                                  label: 'F5 시간',
+                                  label: tr('e.f5'),
                                   textColor: p.cmd,
-                                  semanticLabel: '커서 자리에 지금 시간 넣기',
+                                  semanticLabel: tr('e.f5sem'),
                                   onTap: _stamp,
                                 ),
                               ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
 import '../logic/commands.dart';
 import '../logic/notes.dart';
 import '../pro/pro_controller.dart';
@@ -13,13 +14,13 @@ class ProScreen extends StatelessWidget {
 
   final NotepadStore store;
 
-  static const _features = [
-    ('cipher 암호화', 'AES-256 · 키는 이 폰의 키체인에만. 열 때 Face ID, 깨진 글자가 풀리면서 열려요'),
-    ('홈 화면 위젯', '작게 · 중간. 고정한 메모(pin) 또는 최근 메모, 파일 목록'),
-    ('잠금화면 위젯', '직사각형 · 시계 위 한 줄'),
-    ('위젯 누르면 그 메모가 바로', '중간 위젯은 파일마다 눌러서 열기'),
-    ('앞으로 나올 PRO 기능', '추가 결제 없이'),
-  ];
+  static List<(String, String)> get _features => [
+        (tr('pro.f1.t'), tr('pro.f1.d')),
+        (tr('pro.f2.t'), tr('pro.f2.d')),
+        (tr('pro.f3.t'), tr('pro.f3.d')),
+        (tr('pro.f4.t'), tr('pro.f4.d')),
+        (tr('pro.f5.t'), tr('pro.f5.d')),
+      ];
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +46,7 @@ class ProScreen extends StatelessWidget {
                     ])),
                     const SizedBox(height: 14),
                     Text('notepad.exe PRO', style: termStyle(p.hi, size: 22, weight: FontWeight.w700)),
-                    Text('한 번 결제, 계속 사용', style: termStyle(p.dim, size: 13)),
+                    Text(tr('pro.once'), style: termStyle(p.dim, size: 13)),
                     const SizedBox(height: 16),
                     _WidgetPreview(note: store.data.widgetNote, palette: p),
                     const SizedBox(height: 16),
@@ -101,7 +102,7 @@ class ProScreen extends StatelessWidget {
                           child: TermWideButton(
                             palette: p,
                             keyLabel: '[ ENTER ]',
-                            label: pro?.price == null ? '구매하기' : '${pro!.price} 구매하기',
+                            label: pro?.price == null ? tr('pro.buy') : tr('pro.buyp', {'p': pro!.price}),
                             onTap: () => pro?.buy(),
                           ),
                         ),
@@ -111,7 +112,7 @@ class ProScreen extends StatelessWidget {
                             Expanded(
                               child: TermBoxButton(
                                 palette: p,
-                                label: '구매 복원',
+                                label: tr('pro.restore'),
                                 textColor: p.cmd,
                                 onTap: () => pro?.restore(),
                               ),
@@ -120,7 +121,7 @@ class ProScreen extends StatelessWidget {
                             Expanded(
                               child: TermBoxButton(
                                 palette: p,
-                                label: '[ ESC ] 닫기',
+                                label: tr('pro.esc'),
                                 onTap: () => Navigator.of(context).maybePop(),
                               ),
                             ),
@@ -130,7 +131,7 @@ class ProScreen extends StatelessWidget {
                         TermWideButton(
                           palette: p,
                           keyLabel: '[ ESC ]',
-                          label: '돌아가기',
+                          label: tr('btn.back'),
                           onTap: () => Navigator.of(context).maybePop(),
                         ),
                     ],
@@ -145,27 +146,27 @@ class ProScreen extends StatelessWidget {
   }
 
   List<Widget> _activeInfo(TermPalette p) => [
-        Text('✓ PRO 활성화됨', style: termStyle(p.ok, weight: FontWeight.w700)),
+        Text(tr('pro.active'), style: termStyle(p.ok, weight: FontWeight.w700)),
         const SizedBox(height: 8),
-        Text('암호화: cipher /e 이름 · 풀기: cipher /d 이름', style: termStyle(p.dim, size: 13)),
+        Text(tr('pro.a1'), style: termStyle(p.dim, size: 13)),
         const SizedBox(height: 4),
-        Text('홈 화면 위젯: 홈 화면 길게 누르기 → 편집 → 위젯 추가 → notepad.exe', style: termStyle(p.dim, size: 13)),
+        Text(tr('pro.a2'), style: termStyle(p.dim, size: 13)),
         const SizedBox(height: 4),
-        Text('잠금화면 위젯: 잠금화면 길게 누르기 → 사용자화 → 잠금 화면 → 위젯', style: termStyle(p.dim, size: 13)),
+        Text(tr('pro.a3'), style: termStyle(p.dim, size: 13)),
       ];
 
   List<Widget> _buyInfo(TermPalette p, ProController? pro) {
     final String status;
     if (pro == null || !pro.available) {
-      status = '스토어에 연결되지 않았어요.';
+      status = tr('pro.nostore');
     } else if (pro.price == null) {
-      status = '가격을 불러오는 중...';
+      status = tr('pro.loading');
     } else {
-      status = '가격 ${pro.price} · 한 번만 결제';
+      status = tr('pro.price', {'p': pro.price});
     }
     return [
       Text(status, style: termStyle(p.fg, size: 13)),
-      Text('같은 Apple ID 로는 다른 기기에서도 복원할 수 있어요.', style: termStyle(p.dim, size: 13)),
+      Text(tr('pro.appleid'), style: termStyle(p.dim, size: 13)),
     ];
   }
 }
@@ -187,7 +188,7 @@ class _WidgetPreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = palette;
     final n = note;
-    final lines = n == null ? <String>['메모가 아직 없어요'] : n.text.split('\n').where((l) => l.trim().isNotEmpty).take(4).toList();
+    final lines = n == null ? <String>[tr('pro.nonote')] : n.text.split('\n').where((l) => l.trim().isNotEmpty).take(4).toList();
     return ExcludeSemantics(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -227,10 +228,10 @@ class _WidgetPreview extends StatelessWidget {
                 children: [
                   Text('dir /a', style: termStyle(p.cmd, size: 11)),
                   const SizedBox(height: 6),
-                  Text('<ENC> 비밀.txt', maxLines: 1, style: termStyle(p.acc, size: 11)),
+                  Text(tr('pro.enc.demo'), maxLines: 1, style: termStyle(p.acc, size: 11)),
                   Text('U2FsdGVkX19x4Q…', maxLines: 1, style: termStyle(p.dim, size: 11)),
                   const SizedBox(height: 8),
-                  Text('<TXT> 장보기.txt', maxLines: 1, style: termStyle(p.fg, size: 11)),
+                  Text(tr('pro.txt.demo'), maxLines: 1, style: termStyle(p.fg, size: 11)),
                 ],
               ),
             ),

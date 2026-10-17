@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show Locale, PlatformDispatcher;
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../l10n/l10n.dart';
 import '../logic/commands.dart';
 import '../logic/notes.dart';
 import '../note_cipher.dart';
@@ -12,7 +14,10 @@ import '../theme/term_palette.dart';
 
 /// 앱 상태. 명령어를 실행하고 폰 안에만 저장한다 (서버 없음).
 class NotepadStore extends ChangeNotifier {
-  NotepadStore({DateTime Function()? clock, this.pro, this.cipher}) : _clock = clock ?? DateTime.now {
+  NotepadStore({DateTime Function()? clock, this.pro, this.cipher, Locale? deviceLocale}) : _clock = clock ?? DateTime.now {
+    // 처음 설치했을 때 사용법 메모가 폰 언어로 나오도록, 만들자마자 폰 언어를 읽는다.
+    L10n.syncDevice(deviceLocale ?? PlatformDispatcher.instance.locale);
+    L10n.pref = L10n.autoPref;
     pro?.addListener(notifyListeners);
   }
 
@@ -41,9 +46,10 @@ class NotepadStore extends ChangeNotifier {
   SharedPreferences? _prefs;
   Timer? _saveTimer;
 
-  final List<LogLine> _log = [
-    const LogLine(LogKind.info, "'help' 를 입력하면 명령어 목록을 볼 수 있어요."),
-  ];
+  final List<LogLine> _log = [];
+
+  /// 처음 안내 한 줄은 (언어가 바뀌어도 맞게) 읽을 때 만든다. 명령어를 한 번 쓰면 사라진다.
+  bool _hintGone = false;
   final List<String> _history = [];
 
   /// dir /a 로 숨긴 파일까지 보는 중
@@ -53,7 +59,7 @@ class NotepadStore extends ChangeNotifier {
   int? pendingDelete;
 
   NotepadData get data => _data;
-  List<LogLine> get log => List.unmodifiable(_log);
+  List<LogLine> get log => List.unmodifiable([if (!_hintGone) LogLine(LogKind.info, tr('hint.help')), ..._log]);
   List<String> get history => List.unmodifiable(_history);
   DateTime now() => _clock();
   List<Note> get listed => _data.listed(showHidden: showHidden);
@@ -83,9 +89,16 @@ class NotepadStore extends ChangeNotifier {
     }
     try {
       _data = NotepadData.fromJson(Map<String, dynamic>.from(jsonDecode(raw) as Map));
+      L10n.pref = _data.lang;
     } catch (e) {
       debugPrint('notepad.exe: 저장된 데이터를 읽지 못했어요. ($e)');
     }
+  }
+
+  /// 폰 언어가 바뀌었을 때. 언어를 'auto' 로 두었다면 화면이 바로 따라간다.
+  void deviceLocaleChanged(Locale locale) {
+    L10n.syncDevice(locale);
+    notifyListeners();
   }
 
   /// 명령어를 실행한다. 화면 이동은 돌려준 결과를 보고 화면이 한다.
@@ -115,7 +128,7 @@ class NotepadStore extends ChangeNotifier {
   /// 지금 (Y/N) 을 묻고 있으면 그 질문.
   String? get question {
     final n = _data.byId(pendingDelete);
-    return n == null ? null : 'C:\\notes\\${n.name}, 삭제하시겠습니까 (Y/N)?';
+    return n == null ? null : 'C:\\notes\\' + tr('c.delq0', {'name': n.name});
   }
 
   /// 화면에 보여줄 내용 (암호화된 메모는 풀어 둔 것)
@@ -196,12 +209,12 @@ class NotepadStore extends ChangeNotifier {
     if (n.hidden) {
       await _encryptPlain(id);
       _plain.remove(id);
-      _apply(CommandResult(_data, [LogLine(LogKind.ok, '✓ 암호화해서 저장했어요: ${n.name}')]));
+      _apply(CommandResult(_data, [LogLine(LogKind.ok, tr('s.encsaved', {'name': n.name}))]));
       return;
     }
     var next = n;
     if (opened != null && opened.$1 != n.text) next = n.withVersion(opened.$1, opened.$2);
-    _apply(CommandResult(_data.replace(next), [LogLine(LogKind.ok, '✓ 저장했어요: ${n.name} · ${comma(n.bytes)} 바이트')]));
+    _apply(CommandResult(_data.replace(next), [LogLine(LogKind.ok, tr('s.saved', {'name': n.name, 'size': comma(n.bytes)}))]));
   }
 
   /// cipher /e: 암호화해서 숨긴다 (PRO). 버전 기록은 지운다 (평문이 남지 않게).
@@ -210,7 +223,7 @@ class NotepadStore extends ChangeNotifier {
     final c = cipher;
     if (n == null || n.hidden) return;
     if (c == null) {
-      note('이 기기에서는 암호화를 쓸 수 없어요.', error: true);
+      note(tr('s.noenc'), error: true);
       return;
     }
     try {
@@ -221,12 +234,12 @@ class NotepadStore extends ChangeNotifier {
             .replace(cur.copyWith(hidden: true, text: '', cipher: () => sealed, versions: const []))
             .copyWith(pinned: () => _data.pinned == id ? null : _data.pinned),
         [
-          LogLine(LogKind.ok, '✓ ${n.name} 을(를) 암호화했어요. (AES-256)'),
-          const LogLine(LogKind.info, '목록에서 숨겨져요 · 보기: dir /a · 열 때 Face ID'),
+          LogLine(LogKind.ok, tr('s.enc.ok', {'name': n.name})),
+          LogLine(LogKind.info, tr('s.enc.info')),
         ],
       ));
     } catch (e) {
-      note('암호화하지 못했어요. ($e)', error: true);
+      note(tr('s.enc.fail', {'e': e}), error: true);
     }
   }
 
@@ -236,13 +249,13 @@ class NotepadStore extends ChangeNotifier {
     final n = _data.byId(id);
     if (n == null) return;
     if (text == null) {
-      note('풀지 못했어요. 키를 찾을 수 없어요.', error: true);
+      note(tr('s.dec.fail'), error: true);
       return;
     }
     _plain.remove(id);
     _apply(CommandResult(
       _data.replace(n.copyWith(hidden: false, text: text, cipher: () => null)),
-      [LogLine(LogKind.ok, '✓ ${n.name} 암호화를 풀었어요.')],
+      [LogLine(LogKind.ok, tr('s.dec.ok', {'name': n.name}))],
     ));
   }
 
@@ -254,7 +267,7 @@ class NotepadStore extends ChangeNotifier {
     final versions = [NoteVersion(n.modified, n.text), for (final x in n.versions) if (!identical(x, v)) x];
     _apply(CommandResult(
       _data.replace(n.copyWith(text: v.text, modified: _clock(), versions: versions.take(maxVersions).toList())),
-      [LogLine(LogKind.ok, '✓ ${n.name} 을(를) ${dirTime(v.at)} 버전으로 되돌렸어요. 지금 것도 버전에 남아요.')],
+      [LogLine(LogKind.ok, tr('s.restored', {'name': n.name, 'when': dirTime(v.at)}))],
     ));
   }
 
@@ -267,6 +280,7 @@ class NotepadStore extends ChangeNotifier {
   CommandResult _apply(CommandResult out) {
     final changed = !identical(out.data, _data);
     _data = out.data;
+    if (out.clearLog || out.lines.isNotEmpty) _hintGone = true;
     if (out.clearLog) {
       _log.clear();
     } else {

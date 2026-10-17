@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 
+import 'l10n/l10n.dart';
+
 enum UnlockResult { ok, cancelled, unavailable, error }
 
 /// 잠긴 메모를 열 때 Face ID (안 되면 기기 암호) 로 확인한다.
@@ -47,7 +49,7 @@ class FakeUnlocker implements Unlocker {
 
 String unlockMessage(UnlockResult r) => switch (r) {
       UnlockResult.ok => '',
-      UnlockResult.cancelled => '취소했어요. 잠긴 파일은 그대로예요.',
-      UnlockResult.unavailable => '이 폰에 암호(Face ID)가 꺼져 있어서 열 수 없어요. 설정 > Face ID 및 암호에서 켜 주세요.',
-      UnlockResult.error => '확인하지 못했어요. 잠시 후 다시 해 주세요.',
+      UnlockResult.cancelled => tr('lock.cancel'),
+      UnlockResult.unavailable => tr('lock.unavail'),
+      UnlockResult.error => tr('lock.err'),
     };

@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../l10n/l10n.dart';
+
 /// notepad.exe PRO: 한 번 결제(비소모성)로 메모 잠금(Face ID)과 아이폰 위젯을 연다.
 ///
 /// App Store Connect / Google Play Console 에 [productId] 로 비소모성 상품을 만들어야 한다.
@@ -60,12 +62,12 @@ class ProController extends ChangeNotifier {
     try {
       _sub = _iap.purchaseStream.listen(
         _onPurchases,
-        onError: (Object e) => _setMessage('결제 정보를 받지 못했어요. ($e)', error: true),
+        onError: (Object e) => _setMessage(tr('m.nostream', {'e': e}), error: true),
       );
       available = await _iap.isAvailable();
       if (available) await loadProduct();
     } catch (e) {
-      debugPrint('notepad.exe pro: 초기화 실패 ($e)');
+      debugPrint('notepad.exe pro: init failed ($e)');
       available = false;
     }
     notifyListeners();
@@ -78,15 +80,14 @@ class ProController extends ChangeNotifier {
       if (product != null) {
         productProblem = null;
       } else if (res.error != null) {
-        productProblem = 'App Store 오류: ${res.error!.message} (${res.error!.code})';
+        productProblem = tr('m.apperr', {'m': res.error!.message, 'c': res.error!.code});
       } else {
-        productProblem = "App Store 에 '$productId' 상품이 아직 없어요. "
-            'App Store Connect 의 앱 내 구입에서 제품 ID 와 상태(제출 준비 완료)를 확인해 주세요.';
+        productProblem = tr('m.noprod', {'id': productId});
       }
-      if (product == null) debugPrint('notepad.exe pro: 상품을 찾지 못함 ${res.notFoundIDs} ${res.error}');
+      if (product == null) debugPrint('notepad.exe pro: product not found ${res.notFoundIDs} ${res.error}');
     } catch (e) {
-      productProblem = '상품 조회 실패: $e';
-      debugPrint('notepad.exe pro: 상품 조회 실패 ($e)');
+      productProblem = tr('m.lookfail', {'e': e});
+      debugPrint('notepad.exe pro: product lookup failed ($e)');
     }
     notifyListeners();
   }
@@ -94,39 +95,39 @@ class ProController extends ChangeNotifier {
   Future<void> buy() async {
     if (isPro || busy) return;
     if (!available) {
-      _setMessage('스토어에 연결할 수 없어요. 인터넷 연결을 확인해 주세요.', error: true);
+      _setMessage(tr('m.nostore'), error: true);
       return;
     }
     if (product == null) {
       await loadProduct();
       if (product == null) {
-        _setMessage('상품 정보를 불러오지 못했어요. ${productProblem ?? '잠시 후 다시 시도해 주세요.'}', error: true);
+        _setMessage(tr('m.noinfo', {'p': productProblem ?? tr('m.retry')}), error: true);
         return;
       }
     }
     busy = true;
-    _setMessage('결제 창을 여는 중...');
+    _setMessage(tr('m.opening'));
     try {
       await _iap.buyNonConsumable(purchaseParam: PurchaseParam(productDetails: product!));
     } catch (e) {
       busy = false;
-      _setMessage('결제를 시작하지 못했어요. ($e)', error: true);
+      _setMessage(tr('m.startfail', {'e': e}), error: true);
     }
   }
 
   Future<void> restore() async {
     if (busy) return;
     if (!available) {
-      _setMessage('스토어에 연결할 수 없어요. 인터넷 연결을 확인해 주세요.', error: true);
+      _setMessage(tr('m.nostore'), error: true);
       return;
     }
     busy = true;
-    _setMessage('구매 내역을 확인하는 중...');
+    _setMessage(tr('m.checking'));
     try {
       await _iap.restorePurchases();
     } catch (e) {
       busy = false;
-      _setMessage('복원하지 못했어요. ($e)', error: true);
+      _setMessage(tr('m.restorefail', {'e': e}), error: true);
       return;
     }
     // 복원할 내역이 없으면 스트림에 아무것도 오지 않는다.
@@ -134,7 +135,7 @@ class ProController extends ChangeNotifier {
     _restoreTimeout = Timer(const Duration(seconds: 8), () {
       if (busy && !isPro) {
         busy = false;
-        _setMessage('복원할 구매 내역을 찾지 못했어요.');
+        _setMessage(tr('m.nothing'));
       }
     });
   }
@@ -145,24 +146,24 @@ class ProController extends ChangeNotifier {
         switch (p.status) {
           case PurchaseStatus.pending:
             busy = true;
-            _setMessage('결제 승인을 기다리는 중...');
+            _setMessage(tr('m.pending'));
           case PurchaseStatus.purchased || PurchaseStatus.restored:
             busy = false;
             await _unlock();
-            _setMessage(p.status == PurchaseStatus.restored ? '구매를 복원했어요. PRO 활성화!' : '결제 완료. PRO 활성화!');
+            _setMessage(tr(p.status == PurchaseStatus.restored ? 'm.restored' : 'm.bought'));
           case PurchaseStatus.error:
             busy = false;
-            _setMessage('결제에 실패했어요. ${p.error?.message ?? ''}'.trim(), error: true);
+            _setMessage(tr('m.failed', {'m': p.error?.message ?? ''}).trim(), error: true);
           case PurchaseStatus.canceled:
             busy = false;
-            _setMessage('결제를 취소했어요.');
+            _setMessage(tr('m.cancel'));
         }
       }
       if (p.pendingCompletePurchase) {
         try {
           await _iap.completePurchase(p);
         } catch (e) {
-          debugPrint('notepad.exe pro: completePurchase 실패 ($e)');
+          debugPrint('notepad.exe pro: completePurchase failed ($e)');
         }
       }
     }

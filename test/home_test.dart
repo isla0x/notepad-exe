@@ -15,7 +15,7 @@ void main() {
     tester.view.physicalSize = const Size(390 * 3, 844 * 3);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
-    final store = NotepadStore(clock: () => DateTime(2026, 10, 2, 16, 52));
+    final store = NotepadStore(deviceLocale: const Locale('ko'), clock: () => DateTime(2026, 10, 2, 16, 52));
     await store.load();
     final unlocker = FakeUnlocker(answer);
     await tester.pumpWidget(MaterialApp(home: HomeScreen(store: store, unlocker: unlocker)));

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
 import '../lock.dart';
 import '../logic/notes.dart';
 import '../state/notepad_store.dart';
@@ -70,13 +71,13 @@ class _BootScreenState extends State<BootScreen> {
     final p = store.palette;
     final now = store.now();
     final hidden = store.data.notes.where((n) => n.hidden).length;
-    final date = '${now.year}-${two(now.month)}-${two(now.day)} (${weekdayKo[now.weekday - 1]})';
+    final date = '${now.year}-${two(now.month)}-${two(now.day)} (${weekdayShort(now.weekday)})';
     final lines = [
-      ('설정 불러오기', 'config'),
-      ('파일 불러오기', '${store.data.notes.length - hidden}개'),
-      ('날짜 확인', date),
-      ('잠금 확인', hidden == 0 ? '없음' : '숨김 $hidden개'),
-      ('명령어 해석기', 'v1.0'),
+      (tr('b.cfg'), 'config'),
+      (tr('b.files'), tr('b.n', {'n': store.data.notes.length - hidden})),
+      (tr('b.date'), date),
+      (tr('b.lock'), hidden == 0 ? tr('b.none') : tr('b.hid', {'n': hidden})),
+      (tr('b.parser'), 'v1.0'),
     ];
     final cells = (_step * 20 / _steps).round();
     final pct = (_step * 100 / _steps).round();
@@ -114,7 +115,7 @@ class _BootScreenState extends State<BootScreen> {
                               ),
                               const SizedBox(height: 20),
                               Text('NOTEPAD [Version 1.0.0]', style: termStyle(p.hi)),
-                              Text('생각나면 바로, 파일 하나로.', style: termStyle(p.dim, size: 13)),
+                              Text(tr('tag'), style: termStyle(p.dim, size: 13)),
                               const SizedBox(height: 32),
                               Text.rich(TextSpan(children: [
                                 TextSpan(text: 'C:\\> ', style: termStyle(p.dim)),
@@ -144,7 +145,7 @@ class _BootScreenState extends State<BootScreen> {
                               ),
                               const Spacer(),
                               const SizedBox(height: 24),
-                              Text('Tip: 명령어가 아닌 말은 빠른 메모.txt 에 저장돼요.', style: termStyle(p.dim, size: 13)),
+                              Text(tr('b.tip', {'q': quickName}), style: termStyle(p.dim, size: 13)),
                               const SizedBox(height: 14),
                               AnimatedOpacity(
                                 opacity: _ready ? 1 : 0,
@@ -154,7 +155,7 @@ class _BootScreenState extends State<BootScreen> {
                                   child: TermWideButton(
                                     palette: p,
                                     keyLabel: '[ ENTER ]',
-                                    label: '시작하기',
+                                    label: tr('b.start'),
                                     onTap: _enter,
                                     trailing: BlinkingCursor(style: termStyle(p.hi, size: 15)),
                                   ),

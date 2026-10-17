@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
 import '../logic/commands.dart';
 import '../logic/notes.dart';
 import '../state/notepad_store.dart';
@@ -56,7 +57,7 @@ class _FcScreenState extends State<FcScreen> {
                       ),
                     ])),
                     const SizedBox(height: 4),
-                    Text('비교 중: ${n.name} · ${dirTime(v.at)} ↔ 지금', style: termStyle(p.dim, size: 12)),
+                    Text(tr('f.cmp', {'name': n.name, 'when': dirTime(v.at)}), style: termStyle(p.dim, size: 12)),
                     const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.all(12),
@@ -66,13 +67,13 @@ class _FcScreenState extends State<FcScreen> {
                         children: [
                           Text('***** ${dirTime(v.at)}', style: termStyle(p.dim, size: 12)),
                           for (final d in diff) _DiffRow(line: d, palette: p),
-                          Text('***** 지금', style: termStyle(p.dim, size: 12)),
+                          Text('***** ${tr('f.now')}', style: termStyle(p.dim, size: 12)),
                         ],
                       ),
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      plus + minus == 0 ? '바뀐 줄이 없어요.' : '+$plus줄 · -$minus줄 바뀜',
+                      plus + minus == 0 ? tr('f.same0') : tr('f.diff', {'p': plus, 'm': minus}),
                       style: termStyle(p.dim, size: 13),
                     ),
                     const SizedBox(height: 18),
@@ -80,9 +81,9 @@ class _FcScreenState extends State<FcScreen> {
                       TextSpan(text: '$prompt ', style: termStyle(p.fg)),
                       TextSpan(text: 'ver ${_bare(n.name)}', style: termStyle(p.cmd)),
                     ])),
-                    Text('고치고 닫을 때마다 남아요 (최대 $maxVersions개) · 눌러서 비교', style: termStyle(p.dim, size: 12)),
+                    Text(tr('f.keep', {'n': maxVersions}), style: termStyle(p.dim, size: 12)),
                     const SizedBox(height: 8),
-                    _VersionRow(palette: p, mark: '●', label: '지금', preview: n.text, selected: false),
+                    _VersionRow(palette: p, mark: '●', label: tr('f.now'), preview: n.text, selected: false),
                     for (var i = 0; i < versions.length; i++)
                       _VersionRow(
                         palette: p,
@@ -106,9 +107,9 @@ class _FcScreenState extends State<FcScreen> {
                           height: 52,
                           child: TermBoxButton(
                             palette: p,
-                            label: '이 버전으로',
+                            label: tr('f.restore'),
                             textColor: p.acc,
-                            semanticLabel: '${dirTime(v.at)} 버전으로 되돌리기',
+                            semanticLabel: tr('f.restore.sem', {'when': dirTime(v.at)}),
                             onTap: () {
                               store.restoreVersion(n.id, pick);
                               Navigator.of(context).maybePop();
@@ -121,7 +122,7 @@ class _FcScreenState extends State<FcScreen> {
                         child: TermWideButton(
                           palette: p,
                           keyLabel: '[ ESC ]',
-                          label: '닫기',
+                          label: tr('btn.close'),
                           onTap: () => Navigator.of(context).maybePop(),
                         ),
                       ),
@@ -154,7 +155,7 @@ class _DiffRow extends StatelessWidget {
       DiffKind.same => (' ', p.fg, Colors.transparent),
     };
     return Semantics(
-      label: '${switch (line.kind) { DiffKind.removed => '지운 줄', DiffKind.added => '더한 줄', DiffKind.same => '같은 줄' }}: ${line.text}',
+      label: '${switch (line.kind) { DiffKind.removed => tr('f.removed'), DiffKind.added => tr('f.added'), DiffKind.same => tr('f.sameline') }}: ${line.text}',
       excludeSemantics: true,
       child: Container(
         color: bg,
@@ -196,7 +197,7 @@ class _VersionRow extends StatelessWidget {
       child: Semantics(
         button: onTap != null,
         selected: selected,
-        label: '$label 버전',
+        label: tr('f.ver', {'label': label}),
         child: Material(
           color: selected ? p.acc.withAlpha(26) : Colors.transparent,
           child: InkWell(

@@ -1,3 +1,4 @@
+import 'dart:ui' show Locale;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:notepad_exe/logic/notes.dart';
 import 'package:notepad_exe/note_cipher.dart';
@@ -20,7 +21,7 @@ void main() {
   });
 
   test('암호화된 메모: 저장소에는 평문이 남지 않는다', () async {
-    final store = NotepadStore(clock: () => now, cipher: MemoryCipher());
+    final store = NotepadStore(deviceLocale: const Locale('ko'), clock: () => now, cipher: MemoryCipher());
     await store.load();
     store.run('echo 엄마 스카프 >> 선물');
     final id = store.data.byName('선물')!.id;
@@ -54,7 +55,7 @@ void main() {
   });
 
   test('버전: 고치고 닫으면 고치기 전 내용이 남고, 되돌릴 수 있다', () async {
-    final store = NotepadStore(clock: () => now);
+    final store = NotepadStore(deviceLocale: const Locale('ko'), clock: () => now);
     await store.load();
     store.run('echo 우유 >> 장보기');
     final id = store.data.byName('장보기')!.id;
@@ -74,7 +75,7 @@ void main() {
   });
 
   test('.LOG 는 열 때 시간이 찍히고, 암호화된 .LOG 도 된다', () async {
-    final store = NotepadStore(clock: () => now, cipher: MemoryCipher());
+    final store = NotepadStore(deviceLocale: const Locale('ko'), clock: () => now, cipher: MemoryCipher());
     await store.load();
     store.run('echo .LOG > 출근');
     final id = store.data.byName('출근')!.id;
