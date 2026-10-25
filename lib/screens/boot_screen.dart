@@ -114,7 +114,7 @@ class _BootScreenState extends State<BootScreen> {
                                 ),
                               ),
                               const SizedBox(height: 20),
-                              Text('NOTEPAD [Version 1.0.0]', style: termStyle(p.hi)),
+                              Text('NOTEPAD [Version 2.0.0]', style: termStyle(p.hi)),
                               Text(tr('tag'), style: termStyle(p.dim, size: 13)),
                               const SizedBox(height: 32),
                               Text.rich(TextSpan(children: [

@@ -142,6 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final n = store.data.byId(id);
     if (n == null) return;
     _busy = true;
+    int? linkedId;
     try {
       if (!await _confirm(n) || !mounted) return;
       if (n.hidden && await store.unlock(id) == null) {
@@ -150,11 +151,12 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       if (!mounted) return;
       _focus.unfocus();
-      await Navigator.of(context).push(termRoute(EditorScreen(store: store, noteId: id, reveal: n.hidden)));
+      linkedId = await Navigator.of(context).push<int>(termRoute(EditorScreen(store: store, noteId: id, reveal: n.hidden)));
       _scrollLog();
     } finally {
       _busy = false;
     }
+    if (linkedId != null && mounted) await _openNote(linkedId);
   }
 
   Future<void> _decrypt(int id) async {
@@ -236,7 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       if (!typing) ...[
-                        Text('NOTEPAD [Version 1.0.0]', style: termStyle(p.hi)),
+                        Text('NOTEPAD [Version 2.0.0]', style: termStyle(p.hi)),
                         Text(tr('tag'), style: termStyle(p.dim, size: 13)),
                         const SizedBox(height: 12),
                       ],

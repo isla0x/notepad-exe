@@ -114,6 +114,19 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
     });
   }
 
+  Future<void> _openLinked(String name) async {
+    final target = store.data.byName(name);
+    if (target == null) {
+      store.run('edit "$name"');
+    }
+    final next = store.data.byName(name);
+    if (next == null || next.id == widget.noteId || _closing) return;
+    _closing = true;
+    store.updateText(widget.noteId, _ctrl.text);
+    await store.closed(widget.noteId);
+    if (mounted) Navigator.of(context).pop(next.id);
+  }
+
   /// F5: 커서 자리에 지금 시간 (옛 메모장처럼)
   void _stamp() {
     final stamp = logStamp(store.now());
@@ -145,6 +158,9 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
         final note = _note;
         final text = _ctrl.text;
         final lines = text.isEmpty ? 1 : '\n'.allMatches(text).length + 1;
+        final linked = linkedNoteNames(text).where((name) => store.data.byName(name)?.id != widget.noteId).toList();
+        final backlinks = store.data.notes.where((n) => !n.hidden && n.id != widget.noteId &&
+          linkedNoteNames(n.text).any((name) => name.toLowerCase() == note?.name.toLowerCase())).toList();
         final isLog = text.split('\n').first.trim() == '.LOG';
         return PopScope(
           canPop: _closing,
@@ -224,7 +240,7 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
                                     cursorColor: p.acc,
                                     keyboardAppearance: p.isLight ? Brightness.light : Brightness.dark,
                                     decoration: InputDecoration.collapsed(
-                                      hintText: tr('e.hint'),
+                                      hintText: '${tr('e.hint')}\n[[메모 이름]] 으로 메모를 연결해요.',
                                       hintStyle: termStyle(p.dim, size: 15, height: 1.6),
                                     ),
                                     onChanged: _onChanged,
@@ -232,6 +248,21 @@ class _EditorScreenState extends State<EditorScreen> with WidgetsBindingObserver
                                 ),
                               ),
                             ),
+                            if (linked.isNotEmpty || backlinks.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              ConstrainedBox(
+                                constraints: const BoxConstraints(maxHeight: 100),
+                                child: SingleChildScrollView(child: Wrap(spacing: 8, runSpacing: 4, children: [
+                                  for (final name in linked)
+                                    TextButton(onPressed: () => _openLinked(name), child: Text(
+                                      '${store.data.byName(name) == null ? "+ " : "→ "}$name',
+                                      style: termStyle(p.acc, size: 12))),
+                                  for (final n in backlinks)
+                                    TextButton(onPressed: () => _openLinked(n.name), child: Text(
+                                      '← ${n.name}', style: termStyle(p.dim, size: 12))),
+                                ])),
+                              ),
+                            ],
                             const SizedBox(height: 6),
                             Row(
                               children: [

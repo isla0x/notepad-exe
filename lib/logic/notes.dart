@@ -356,3 +356,13 @@ List<DiffLine> diffLines(String older, String newer) {
   }
   return out;
 }
+
+/// Names inside [[...]], unique after normalizing .txt and letter case.
+List<String> linkedNoteNames(String text) {
+  final seen = <String>{};
+  return [
+    for (final m in RegExp(r'\[\[([^\[\]\n]+)\]\]').allMatches(text))
+      if (normalizeName(m[1]!) case final String name)
+        if (seen.add(name.toLowerCase())) name,
+  ];
+}
